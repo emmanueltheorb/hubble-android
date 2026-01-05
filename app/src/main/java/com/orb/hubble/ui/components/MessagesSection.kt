@@ -71,12 +71,13 @@ import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.Grey3
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
+import com.orb.hubble.ui.theme.White3
 
 @Composable
 fun MessagesSection(
     modifier: Modifier = Modifier,
     messages: List<Message>,
-    bottomPadding: Dp = 60.dp,
+    bottomPadding: Dp = 55.dp,
     onMessageDragged: (Message) -> Unit
 ) {
     LazyColumn(
@@ -104,7 +105,7 @@ fun MessageItem(
             initialValue = DragState.Left,
             anchors = DraggableAnchors {
                 DragState.Left at 0f
-                DragState.Right at 250f
+                DragState.Right at 225f
             }
         )
     }
@@ -124,9 +125,9 @@ fun MessageItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 3.dp)
-            .padding(bottom = 15.dp)
-            .padding(horizontal = 15.dp)
+            .padding(top = 2.7.dp)
+            .padding(bottom = 12.dp)
+            .padding(horizontal = 12.dp)
             .offset {
                 IntOffset(
                     x = dragState.requireOffset().roundToInt(),
@@ -141,7 +142,7 @@ fun MessageItem(
         if (message.repliedTo != null && message.repliedMessage != null) {
             Row(
                 modifier = modifier
-                    .padding(start = 60.dp)
+                    .padding(start = 54.dp)
             ) {
                 Text(
                     text = "@${message.repliedMessage.user.username}",
@@ -149,11 +150,13 @@ fun MessageItem(
                     style = Typography.labelSmall,
                     color = message.repliedMessage.user.color.toColor()
                 )
-                Spacer(modifier.width(3.dp))
+                Spacer(modifier.width(2.7.dp))
                 Text(
                     text = message.repliedMessage.content,
-                    color = White1,
-                    style = Typography.labelSmall
+                    color = White3,
+                    style = Typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -161,27 +164,29 @@ fun MessageItem(
             verticalAlignment = Alignment.Top
         ) {
             Surface(
-                modifier = modifier.size(45.dp),
+                modifier = modifier.size(40.5.dp),
                 color = Color(0xFF3F3F3F),
                 shape = CircleShape
             ) {
 
             }
-            Spacer(modifier.width(15.dp))
+            Spacer(modifier.width(12.dp))
             Column(
                 modifier = modifier
-                    .padding(top = 3.dp)
+                    .padding(top = 2.7.dp)
                     .wrapContentHeight()
             ) {
                 Text(
                     text = message.user.username,
-                    fontWeight = FontWeight.Bold,
-                    style = Typography.bodyMedium,
+                    style = Typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 20.sp
+                    ),
                     color = message.user.color.toColor()
                 )
                 Text(
                     text = message.content,
-                    color = White1,
+                    color = White3,
                     style = Typography.bodySmall
                 )
             }
@@ -199,50 +204,51 @@ fun InputField(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
+            .heightIn(min = 55.dp)
             .background(color = Black2)
-            .padding(horizontal = 15.dp)
+            .padding(horizontal = 12.dp)
             .padding(vertical = 5.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         Surface(
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 50.dp),
-            shape = RoundedCornerShape(25.dp),
+                .heightIn(min = 45.dp),
+            shape = RoundedCornerShape(22.5.dp),
             color = Grey2,
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .padding(vertical = 10.dp),
+                    .padding(horizontal = 9.dp)
+                    .padding(vertical = 9.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 IconButton(
                     onClick = {},
-                    modifier = Modifier.size(30.dp)
+                    modifier = Modifier.size(27.dp)
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.emojis_icon),
                         contentDescription = "emojis icon",
                         tint = White1,
-                        modifier = Modifier.size(27.dp)
+                        modifier = Modifier.size(24.3.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(9.dp))
                 BasicTextField(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 25.dp)
+                        .defaultMinSize(minHeight = 22.5.dp)
                         .focusRequester(focusRequester),
                     value = textValue.value,
                     onValueChange = {
                         textValue.value = it
                     },
                     textStyle = Typography.bodyMedium.copy(
-                        color = White1,
-                        fontWeight = FontWeight.Normal
+                        color = White3,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 18.sp
                     ),
                     cursorBrush = SolidColor(White1),
                     maxLines = 6,
@@ -254,7 +260,7 @@ fun InputField(
                                     style = Typography.bodyMedium.copy(
                                         color = Grey3,
                                         fontWeight = FontWeight.Normal,
-                                        fontSize = 25.sp
+                                        fontSize = 19.sp
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -266,20 +272,20 @@ fun InputField(
                 )
             }
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(9.dp))
         IconButton(
             onClick = onSendClicked,
             shape = CircleShape,
             colors = IconButtonDefaults.iconButtonColors(
                 containerColor = Grey2
             ),
-            modifier = Modifier.size(50.dp)
+            modifier = Modifier.size(45.dp)
         ) {
             Icon(
                 painter = painterResource(R.drawable.send_icon),
                 contentDescription = "send message icon",
                 tint = White1,
-                modifier = Modifier.size(25.dp)
+                modifier = Modifier.size(22.5.dp)
             )
         }
     }

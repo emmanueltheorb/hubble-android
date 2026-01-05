@@ -16,7 +16,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import com.orb.hubble.data.HomeScreenViewModel
+import com.orb.hubble.ui.screens.CreatePostScreen
 import com.orb.hubble.ui.screens.HomeScreen
+import com.orb.hubble.ui.screens.PostScreen
 import com.orb.hubble.ui.screens.ViewStatusScreen
 
 @Composable
@@ -48,6 +50,9 @@ fun NavGraphBuilder.homeGraph(
                 viewModel = viewModel,
                 navToViewStatusScreen = { userId ->
                     navController.navigate(Dest.ViewStatusScreen(userId = userId))
+                },
+                navToAddPostScreen = {
+                    navController.navigate(Dest.PostScreen)
                 }
             )
         }
@@ -62,6 +67,30 @@ fun NavGraphBuilder.homeGraph(
             val viewStatusScreen: Dest.ViewStatusScreen = it.toRoute<Dest.ViewStatusScreen>()
             ViewStatusScreen(
                 userId = viewStatusScreen.userId,
+                viewModel = viewModel
+            )
+        }
+
+        composable<Dest.PostScreen> {
+            PostScreen(
+                onMediaSelected = { uriString ->
+                    navController.navigate(Dest.CreatePostScreen(mediaUri = uriString))
+                },
+                onNavigate = {
+
+                }
+            )
+        }
+
+        composable<Dest.CreatePostScreen> {
+            val parentEntry = remember(it) {
+                navController.getBackStackEntry(SubGraph.Home)
+            }
+            val viewModel: HomeScreenViewModel = hiltViewModel(parentEntry)
+
+            val createPostScreen: Dest.CreatePostScreen = it.toRoute<Dest.CreatePostScreen>()
+            CreatePostScreen(
+                mediaUri = createPostScreen.mediaUri,
                 viewModel = viewModel
             )
         }

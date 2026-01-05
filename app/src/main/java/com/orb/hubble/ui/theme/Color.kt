@@ -31,3 +31,5 @@ val Grey3 = Color(0xFF57575D)
 val Grey4 = Color(0xFF8c9195)
 
 val White1 = Color(0XFFE7E0E8)
+val White2 = Color(0xFFC7C5CB)
+val White3 = Color(0xFFC6C6CB)

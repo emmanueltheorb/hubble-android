@@ -6,35 +6,67 @@ import com.orb.hubble.data.CreatePostRequest
 import com.orb.hubble.data.FollowRequest
 import com.orb.hubble.data.Message
 import com.orb.hubble.data.Post
+import com.orb.hubble.data.PostDao
 import com.orb.hubble.data.PostMessageRequest
 import com.orb.hubble.data.WebsocketEvent
+import com.orb.hubble.di.ApplicationScope
 import com.orb.hubble.service.WebsocketService
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-class HubbleRepository(private val websocketService: WebsocketService) {
+@Singleton
+class HubbleRepository @Inject constructor(
+    private val websocketService: WebsocketService,
+    private val postDao: PostDao,
+    @ApplicationScope private val externalScope: CoroutineScope
+) {
+
+    init {
+        observeAndPersistPosts()
+    }
+
     val connectionState: Flow<WebsocketEvent> = websocketService.events
 
-    val newPosts: Flow<Post> = websocketService.events
-        .map { event ->
-            when (event) {
-                is WebsocketEvent.NewPost -> event.post
-                else -> null
+    private fun observeAndPersistPosts() {
+        websocketService.events
+            .onEach { event ->
+                when (event) {
+                    is WebsocketEvent.NewPost -> postDao.upsertPost(event.post)
+                    is WebsocketEvent.MissedPost -> postDao.upsertPost(event.post)
+                    // You can add message persistence here later
+                    else -> Unit
+                }
             }
-        }
-        .filterNotNull()
+            .launchIn(externalScope) // Crucial: This runs independently of any ViewModel
+    }
 
-    val missedPosts: Flow<Post> = websocketService.events
-        .map { event ->
-            when (event) {
-                is WebsocketEvent.MissedPost -> event.post
-                else -> null
-            }
-        }
-        .filterNotNull()
+    fun getAllPosts(): Flow<List<Post>> = postDao.getPostsOrderedByTimestamp()
+
+//    val newPosts: Flow<Post> = websocketService.events
+//        .map { event ->
+//            when (event) {
+//                is WebsocketEvent.NewPost -> event.post
+//                else -> null
+//            }
+//        }
+//        .filterNotNull()
+//
+//    val missedPosts: Flow<Post> = websocketService.events
+//        .map { event ->
+//            when (event) {
+//                is WebsocketEvent.MissedPost -> event.post
+//                else -> null
+//            }
+//        }
+//        .filterNotNull()
 
     val messages: Flow<Message> = websocketService.events
         .map { event ->

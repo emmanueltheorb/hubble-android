@@ -25,11 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,11 +52,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -82,11 +75,10 @@ import com.orb.hubble.ui.components.MessagesSection
 import com.orb.hubble.ui.components.toColor
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black2
-import com.orb.hubble.ui.theme.Blue1
 import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
-import kotlin.time.Clock
+import com.orb.hubble.ui.theme.White3
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -94,14 +86,14 @@ import kotlin.time.Instant
 @Composable
 fun ViewStatusScreen(
     modifier: Modifier = Modifier,
-    userId: Int,
+    userId: Int = 4,
     viewModel: HomeScreenViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
         Log.d("DEBUG", "ViewStatusScreen ViewModel: $viewModel")
     }
 
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     val posts = postsList10
     var currentIndex by remember { mutableIntStateOf(0) }
 
@@ -115,7 +107,7 @@ fun ViewStatusScreen(
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
     val screenHeight = LocalWindowInfo.current.containerSize.height.dp
-    val bottomSheetHeight = screenHeight * 0.295f
+    val bottomSheetHeight = screenHeight * 0.2655f
 
     val context = LocalActivity.current as ComponentActivity
 
@@ -159,12 +151,12 @@ fun ViewStatusScreen(
         ) {
             Column(
                 modifier = Modifier.defaultMinSize(minHeight = 10.dp),
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Top
             ) {
                 ProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(2.5.dp),
+                        .height(2.25.dp),
                     currentIndex = currentIndex,
                     posts = posts
                 )
@@ -222,7 +214,7 @@ fun ViewStatusScreen(
                 ) {
                     MessagesSection(
                         messages = messages,
-                        bottomPadding = if (repliedMessage != null) 99.dp else 60.dp,
+                        bottomPadding = if (repliedMessage != null) 87.1.dp else 55.dp,
                         onMessageDragged = { message ->
                             controller?.show()
                             repliedMessage = message
@@ -240,8 +232,8 @@ fun ViewStatusScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(Grey2)
-                                    .padding(horizontal = 15.dp)
-                                    .padding(vertical = 10.dp)
+                                    .padding(horizontal = 13.dp)
+                                    .padding(vertical = 6.dp)
                             ) {
                                 Text(
                                     text = "@${repliedMessage!!.user.username}",
@@ -249,10 +241,10 @@ fun ViewStatusScreen(
                                     style = Typography.bodySmall,
                                     color = repliedMessage!!.user.color.toColor()
                                 )
-                                Spacer(Modifier.width(5.dp))
+                                Spacer(Modifier.width(4.5.dp))
                                 Text(
                                     text = repliedMessage!!.content,
-                                    color = White1,
+                                    color = White3,
                                     style = Typography.bodySmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -265,13 +257,13 @@ fun ViewStatusScreen(
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = White1
                                     ),
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(19.8.dp)
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_close),
                                         contentDescription = "cancel reply",
                                         tint = Black1,
-                                        modifier = Modifier.size(19.dp)
+                                        modifier = Modifier.size(17.1.dp)
                                     )
                                 }
                             }
@@ -312,7 +304,7 @@ fun ProgressIndicator(
     Canvas(modifier = modifier) {
         val totalWidth = size.width
         val segmentCount = posts.size
-        val gapWidth = 6.dp.toPx() // Gap between segments
+        val gapWidth = 5.4.dp.toPx() // Gap between segments
         val totalGapWidth = gapWidth * (segmentCount + 1)
         val availableWidth = totalWidth - totalGapWidth
         val segmentWidth = availableWidth / segmentCount
@@ -344,12 +336,12 @@ fun BottomRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(50.dp)
-            .padding(horizontal = 10.dp),
+            .height(45.dp)
+            .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            modifier = modifier.size(45.dp),
+            modifier = modifier.size(40.5.dp),
             color = Color(0xFF3F3F3F),
             shape = CircleShape
         ) {
@@ -357,7 +349,7 @@ fun BottomRow(
         }
         Text(
             text = post.user.username,
-            modifier = modifier.padding(horizontal = 4.dp)
+            modifier = modifier.padding(horizontal = 3.6.dp)
         )
         Spacer(modifier = modifier.weight(1f))
         IconButton(onCommentsClicked) {
@@ -365,7 +357,7 @@ fun BottomRow(
                 painter = painterResource(R.drawable.chat_hb_filled),
                 contentDescription = "View comments Button",
                 tint = Color.White,
-                modifier = modifier.size(50.dp)
+                modifier = modifier.size(45.dp)
             )
         }
     }

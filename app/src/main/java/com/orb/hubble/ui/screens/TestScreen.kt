@@ -32,7 +32,7 @@ fun TestScreen(
     userId: Int,
     viewModel: HomeScreenViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.state.collectAsState()
 
     val contentUrl = remember { mutableStateOf("") }
     val description = remember { mutableStateOf("") }
@@ -42,7 +42,7 @@ fun TestScreen(
     val postId = remember { mutableStateOf("") }
 
     LaunchedEffect(userId) {
-        viewModel.connect(userId)
+        viewModel.connect()
     }
 
     when {
@@ -56,7 +56,7 @@ fun TestScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text("Disconnected")
-                Button(onClick = { viewModel.connect(userId) }) {
+                Button(onClick = { viewModel.connect() }) {
                     Text("Reconnect")
                 }
             }

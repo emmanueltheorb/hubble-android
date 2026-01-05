@@ -98,6 +98,8 @@ class WebsocketService @Inject constructor() {
                 is ClientEvent.JoinPost -> event.toJson(json)
                 is ClientEvent.PostMessage -> event.toJson(json)
                 is ClientEvent.SyncContact -> event.toJson(json)
+                is ClientEvent.GetFollowedUsers -> event.toJson(json)
+                is ClientEvent.GetContacts -> event.toJson(json)
             }
 
             websocketSession?.send(Frame.Text(jsonString))
@@ -129,6 +131,18 @@ class WebsocketService @Inject constructor() {
                         jsonObject["message"] ?: return
                     )
                     _events.emit(WebsocketEvent.PostMessage(message = message))
+                }
+                "followed_ids" -> {
+                    val list = json.decodeFromJsonElement<List<Int>>(
+                        jsonObject["followedUsers"] ?: return
+                    )
+                    _events.emit(WebsocketEvent.FollowedUsers(followedUsers = list))
+                }
+                "contact_ids" -> {
+                    val list = json.decodeFromJsonElement<List<Int>>(
+                        jsonObject["contacts"] ?: return
+                    )
+                    _events.emit(WebsocketEvent.Contacts(contacts = list))
                 }
                 else -> {
                     // Handle connection messages or other types

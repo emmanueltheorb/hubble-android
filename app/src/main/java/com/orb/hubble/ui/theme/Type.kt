@@ -12,7 +12,18 @@ import com.orb.hubble.R
 val RobotoFontFamily = FontFamily(
     Font(R.font.font_roboto_bold, weight = FontWeight.Bold, style = FontStyle.Normal),
     Font(R.font.font_roboto_black, weight = FontWeight.Black, style = FontStyle.Normal),
-    Font(R.font.font_roboto_regular, weight = FontWeight.Bold, style = FontStyle.Normal)
+    Font(R.font.font_roboto_regular, weight = FontWeight.Normal, style = FontStyle.Normal)
+)
+
+val NunitoFontFamily = FontFamily(
+    Font(R.font.nunito_extra_light, weight = FontWeight.ExtraLight, style = FontStyle.Normal),
+    Font(R.font.nunito_light, weight = FontWeight.Light, style = FontStyle.Normal),
+    Font(R.font.nunito_regular, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(R.font.nunito_medium, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(R.font.nunito_semi_bold, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(R.font.nunito_bold, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(R.font.nunito_extra_bold, weight = FontWeight.ExtraBold, style = FontStyle.Normal),
+    Font(R.font.nunito_black, weight = FontWeight.Black, style = FontStyle.Normal)
 )
 
 // Set of Material typography styles to start with
@@ -20,28 +31,30 @@ val Typography = Typography(
     headlineLarge = TextStyle(
         fontFamily = RobotoFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 34.sp
+        fontSize = 26.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = NunitoFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 24.sp,
-        lineHeight = 24.sp
+        fontSize = 18.sp,
+        lineHeight = 20.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = NunitoFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 22.sp
+        fontSize = 17.sp,
+        lineHeight = 24.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = NunitoFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 19.sp
+        fontSize = 15.sp,
+        lineHeight = 18.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = NunitoFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 17.sp
+        fontSize = 12.sp
     )
     /* Other default text styles to override
     titleLarge = TextStyle(

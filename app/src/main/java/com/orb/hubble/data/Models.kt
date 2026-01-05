@@ -1,5 +1,11 @@
 package com.orb.hubble.data
 
+import android.net.Uri
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -12,12 +18,16 @@ import kotlinx.serialization.json.Json
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+@Entity
 @Serializable
 data class Post @OptIn(ExperimentalTime::class) constructor(
+    @PrimaryKey
     val id: Int,
     val contentUrl: String?,
+    val thumbnailUrl: String?,
     val description: String?,
     val contentText: String? = null,
+    val thumbnailAt: String?,
     val tags: List<String>?,
     @Serializable(with = InstantSerializer::class)
     val expiresAt: Instant,
@@ -85,6 +95,12 @@ sealed class WebsocketEvent {
 
     @Serializable
     data class PostMessage(val message: Message) : WebsocketEvent()
+
+    @Serializable
+    data class FollowedUsers(val followedUsers: List<Int>) : WebsocketEvent()
+
+    @Serializable
+    data class Contacts(val contacts: List<Int>) : WebsocketEvent()
 
     @Serializable
     data class Connected(val message: String) : WebsocketEvent()
@@ -164,6 +180,30 @@ sealed class ClientEvent {
         fun toJson(json: Json): String =
             json.encodeToString(Wrapper.serializer(), Wrapper(users = users))
     }
+
+    @Serializable
+    data class GetFollowedUsers(val userId: Int) : ClientEvent() {
+        @Serializable
+        private data class Wrapper(
+            val type: String = "get_followed",
+            @SerialName("user_id") val userId: Int
+        )
+
+        fun toJson(json: Json): String =
+            json.encodeToString(Wrapper.serializer(), Wrapper(userId = userId))
+    }
+
+    @Serializable
+    data class GetContacts(val userId: Int) : ClientEvent() {
+        @Serializable
+        private data class Wrapper(
+            val type: String = "get_contacts",
+            @SerialName("user_id") val userId: Int
+        )
+
+        fun toJson(json: Json): String =
+            json.encodeToString(Wrapper.serializer(), Wrapper(userId = userId))
+    }
 }
 
 @OptIn(ExperimentalTime::class)
@@ -191,6 +231,8 @@ val postsList10 = listOf(
     Post(
         id = 1,
         contentUrl = "https://example.com/content1.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Beautiful sunset at the beach",
         contentText = "Enjoying the peaceful evening waves",
         tags = listOf("sunset", "beach", "vacation"),
@@ -203,6 +245,8 @@ val postsList10 = listOf(
     Post(
         id = 2,
         contentUrl = "https://example.com/content2.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Morning coffee routine",
         contentText = "Best way to start the day",
         tags = listOf("coffee", "morning", "routine"),
@@ -215,6 +259,8 @@ val postsList10 = listOf(
     Post(
         id = 3,
         contentUrl = "https://example.com/content3.mp4",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "New recipe experiment",
         contentText = "Trying out vegan pasta carbonara",
         tags = listOf("cooking", "vegan", "recipe"),
@@ -227,6 +273,8 @@ val postsList10 = listOf(
     Post(
         id = 4,
         contentUrl = null,
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Thoughts on productivity",
         contentText = "Deep work vs shallow work strategies",
         tags = listOf("productivity", "work", "focus"),
@@ -239,6 +287,8 @@ val postsList10 = listOf(
     Post(
         id = 5,
         contentUrl = "https://example.com/content5.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Weekend hiking adventure",
         contentText = "Reached the mountain peak today!",
         tags = listOf("hiking", "adventure", "nature"),
@@ -251,6 +301,8 @@ val postsList10 = listOf(
     Post(
         id = 6,
         contentUrl = "https://example.com/content6.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "New book acquisition",
         contentText = "Just got this amazing sci-fi novel",
         tags = listOf("books", "reading", "sci-fi"),
@@ -263,6 +315,8 @@ val postsList10 = listOf(
     Post(
         id = 7,
         contentUrl = null,
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Programming insights",
         contentText = "Refactoring legacy code successfully",
         tags = listOf("programming", "coding", "refactoring"),
@@ -275,6 +329,8 @@ val postsList10 = listOf(
     Post(
         id = 8,
         contentUrl = "https://example.com/content8.mp4",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Music practice session",
         contentText = "Learning the new guitar solo",
         tags = listOf("music", "guitar", "practice"),
@@ -287,6 +343,8 @@ val postsList10 = listOf(
     Post(
         id = 9,
         contentUrl = "https://example.com/content9.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Art exhibition visit",
         contentText = "Impressed by the modern art collection",
         tags = listOf("art", "exhibition", "culture"),
@@ -299,6 +357,8 @@ val postsList10 = listOf(
     Post(
         id = 10,
         contentUrl = "https://example.com/content10.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Family gathering memories",
         contentText = "Great time with everyone together",
         tags = listOf("family", "memories", "gathering"),
@@ -316,6 +376,8 @@ val postsList4 = listOf(
     Post(
         id = 11,
         contentUrl = "https://example.com/small1.jpg",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Quick morning workout",
         contentText = "15 minute routine to start the day",
         tags = listOf("fitness", "workout", "health"),
@@ -328,6 +390,8 @@ val postsList4 = listOf(
     Post(
         id = 12,
         contentUrl = null,
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "Meditation practice",
         contentText = "10 minutes of mindfulness meditation",
         tags = listOf("meditation", "mindfulness", "peace"),
@@ -340,6 +404,8 @@ val postsList4 = listOf(
     Post(
         id = 13,
         contentUrl = "https://example.com/small3.mp4",
+        thumbnailUrl = "",
+        thumbnailAt = "",
         description = "New plant in the collection",
         contentText = "Added a beautiful monstera plant",
         tags = listOf("plants", "gardening", "home"),
@@ -381,12 +447,12 @@ val messageList = listOf(
     ),
     Message(
         id = 2,
-        content = "i mean i want sm1 1-2 years older than me",
+        content = "Hugging your girlfriend from behind is not an issue to anyone",
         postId = 1,
         repliedTo = null,
         repliedMessage = null,
         insertedAt = Instant.fromEpochSeconds(1636726400),
-        user = User(1, "3cstacy", "#26DE81", "+1234567802")
+        user = User(1, "Serpentine", "#C8A2C8", "+1234567802")
     ),
     Message(
         id = 3,
@@ -440,7 +506,7 @@ val messageList = listOf(
         repliedTo = null,
         repliedMessage = null,
         insertedAt = Instant.fromEpochSeconds(1636726400),
-        user = User(1, "3cstacy", "#26DE81", "+1234567802")
+        user = User(1, "Orb", "#D1A6F0", "+1234567802")
     ),
     Message(
         id = 9,
@@ -453,7 +519,7 @@ val messageList = listOf(
     ),
     Message(
         id = 10,
-        content = "ight i thought you meant like 40 years older",
+        content = "i use knight im 100% using ts",
         postId = 1,
         repliedTo = null,
         repliedMessage = null,
@@ -468,6 +534,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 1,
             contentUrl = "https://example.com/content1.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Beautiful sunset at the beach",
             contentText = "Enjoying the peaceful evening waves",
             tags = listOf("sunset", "beach", "vacation"),
@@ -475,11 +543,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 101,
             insertedAt = Instant.fromEpochSeconds(1635689600),
             viewed = false,
-            user = User(101, "sunset_lover", "#FF6B6B", "+1234567890")
+            user = User(101, "Chudy", "#FF6B6B", "+1234567890")
         ),
         Post(
             id = 11,
             contentUrl = "https://example.com/sunrise1.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Early morning sunrise",
             contentText = "Waking up to this magnificent view",
             tags = listOf("sunrise", "morning", "nature"),
@@ -492,6 +562,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 12,
             contentUrl = "https://example.com/mountain_view.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Mountain hiking adventure",
             contentText = "Conquered the highest peak in the region!",
             tags = listOf("hiking", "mountains", "adventure"),
@@ -504,6 +576,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 13,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Reflections on life",
             contentText = "Sometimes the simplest moments are the most beautiful",
             tags = listOf("reflection", "life", "thoughts"),
@@ -511,13 +585,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 101,
             insertedAt = Instant.fromEpochSeconds(1635948800),
             viewed = false,
-            user = User(101, "sunset_lover", "#FF6B6B", "+1234567890")
+            user = User(101, "Mummy Hazan", "#FF6B6B", "+1234567890")
         )
     ),
     102 to listOf(
         Post(
             id = 2,
             contentUrl = "https://example.com/content2.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Morning coffee routine",
             contentText = "Best way to start the day",
             tags = listOf("coffee", "morning", "routine"),
@@ -525,11 +601,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 102,
             insertedAt = Instant.fromEpochSeconds(1635776000),
             viewed = false,
-            user = User(102, "coffee_master", "#4ECDC4", "+1234567891")
+            user = User(102, "Course Adviser", "#4ECDC4", "+1234567891")
         ),
         Post(
             id = 14,
             contentUrl = "https://example.com/latte_art.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New latte art technique",
             contentText = "Perfecting my heart-shaped latte art",
             tags = listOf("coffee", "latte", "art"),
@@ -542,6 +620,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 15,
             contentUrl = "https://example.com/coffee_beans.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Fresh coffee beans from Ethiopia",
             contentText = "The aroma is absolutely incredible",
             tags = listOf("coffee", "beans", "ethiopia"),
@@ -554,20 +634,24 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 16,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Coffee brewing methods",
             contentText = "Comparing French press vs pour over techniques",
             tags = listOf("coffee", "brewing", "methods"),
             expiresAt = Instant.fromEpochSeconds(1736208000),
             userId = 102,
-            insertedAt = Instant.fromEpochSeconds(1636208000),
+            insertedAt = Instant.parse("2025-11-25T19:30:00Z"),
             viewed = true,
-            user = User(102, "coffee_master", "#4ECDC4", "+1234567891")
+            user = User(102, "John Elect", "#4ECDC4", "+1234567891")
         )
     ),
     103 to listOf(
         Post(
             id = 3,
             contentUrl = "https://example.com/content3.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New recipe experiment",
             contentText = "Trying out vegan pasta carbonara",
             tags = listOf("cooking", "vegan", "recipe"),
@@ -575,11 +659,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 103,
             insertedAt = Instant.fromEpochSeconds(1635862400),
             viewed = true,
-            user = User(103, "chef_extraordinaire", "#45B7D1", "+1234567892")
+            user = User(103, "Jessica", "#45B7D1", "+1234567892")
         ),
         Post(
             id = 17,
             contentUrl = "https://example.com/baking.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Sourdough bread success",
             contentText = "Finally got the perfect crust!",
             tags = listOf("baking", "bread", "sourdough"),
@@ -592,6 +678,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 18,
             contentUrl = "https://example.com/dessert.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Chocolate lava cake tutorial",
             contentText = "Step by step guide to perfect molten chocolate cake",
             tags = listOf("dessert", "chocolate", "baking"),
@@ -599,13 +687,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 103,
             insertedAt = Instant.fromEpochSeconds(1636380800),
             viewed = true,
-            user = User(103, "chef_extraordinaire", "#45B7D1", "+1234567892")
+            user = User(103, "Uncle Paul 2", "#45B7D1", "+1234567892")
         )
     ),
     104 to listOf(
         Post(
             id = 4,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Thoughts on productivity",
             contentText = "Deep work vs shallow work strategies",
             tags = listOf("productivity", "work", "focus"),
@@ -613,11 +703,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 104,
             insertedAt = Instant.fromEpochSeconds(1635948800),
             viewed = false,
-            user = User(104, "productive_mind", "#96CEB4", "+1234567893")
+            user = User(104, "Ekene", "#96CEB4", "+1234567893")
         ),
         Post(
             id = 19,
             contentUrl = "https://example.com/workspace.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "My productive workspace",
             contentText = "Minimalist setup for maximum focus",
             tags = listOf("productivity", "workspace", "minimalism"),
@@ -630,6 +722,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 20,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Time management techniques",
             contentText = "Pomodoro technique changed my life",
             tags = listOf("productivity", "time", "management"),
@@ -637,13 +731,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 104,
             insertedAt = Instant.fromEpochSeconds(1636553600),
             viewed = false,
-            user = User(104, "productive_mind", "#96CEB4", "+1234567893")
+            user = User(104, "productive mind", "#96CEB4", "+1234567893")
         )
     ),
     105 to listOf(
         Post(
             id = 5,
             contentUrl = "https://example.com/content5.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Weekend hiking adventure",
             contentText = "Reached the mountain peak today!",
             tags = listOf("hiking", "adventure", "nature"),
@@ -651,11 +747,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 105,
             insertedAt = Instant.fromEpochSeconds(1636035200),
             viewed = false,
-            user = User(105, "mountain_explorer", "#FECA57", "+1234567894")
+            user = User(105, "Prince Bills", "#FECA57", "+1234567894")
         ),
         Post(
             id = 21,
             contentUrl = "https://example.com/camping.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Night under the stars",
             contentText = "Camping in the wilderness with amazing views",
             tags = listOf("camping", "stars", "wilderness"),
@@ -668,6 +766,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 22,
             contentUrl = "https://example.com/waterfall.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Hidden waterfall discovered",
             contentText = "Found this beautiful hidden gem during today's hike",
             tags = listOf("hiking", "waterfall", "discovery"),
@@ -680,6 +780,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 23,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Hiking gear recommendations",
             contentText = "My essential gear for multi-day hikes",
             tags = listOf("hiking", "gear", "recommendations"),
@@ -687,13 +789,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 105,
             insertedAt = Instant.fromEpochSeconds(1636812800),
             viewed = true,
-            user = User(105, "mountain_explorer", "#FECA57", "+1234567894")
+            user = User(105, "mountain explorer", "#FECA57", "+1234567894")
         )
     ),
     106 to listOf(
         Post(
             id = 6,
             contentUrl = "https://example.com/content6.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New book acquisition",
             contentText = "Just got this amazing sci-fi novel",
             tags = listOf("books", "reading", "sci-fi"),
@@ -701,11 +805,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 106,
             insertedAt = Instant.fromEpochSeconds(1636121600),
             viewed = true,
-            user = User(106, "book_worm", "#FF9FF3", "+1234567895")
+            user = User(106, "Stephen", "#FF9FF3", "+1234567895")
         ),
         Post(
             id = 24,
             contentUrl = "https://example.com/library.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "My personal library",
             contentText = "Finally organized my book collection",
             tags = listOf("books", "library", "collection"),
@@ -718,6 +824,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 25,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Book review: Dune",
             contentText = "Frank Herbert's masterpiece still holds up",
             tags = listOf("books", "review", "sci-fi"),
@@ -725,13 +833,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 106,
             insertedAt = Instant.fromEpochSeconds(1636985600),
             viewed = true,
-            user = User(106, "book_worm", "#FF9FF3", "+1234567895")
+            user = User(106, "book worm", "#FF9FF3", "+1234567895")
         )
     ),
     107 to listOf(
         Post(
             id = 7,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Programming insights",
             contentText = "Refactoring legacy code successfully",
             tags = listOf("programming", "coding", "refactoring"),
@@ -739,11 +849,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 107,
             insertedAt = Instant.fromEpochSeconds(1636208000),
             viewed = false,
-            user = User(107, "code_artist", "#54A0FF", "+1234567896")
+            user = User(107, "Orb", "#54A0FF", "09079302010")
         ),
         Post(
             id = 26,
             contentUrl = "https://example.com/code_snippet.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Elegant algorithm solution",
             contentText = "Solved this complex problem with just a few lines",
             tags = listOf("programming", "algorithm", "solution"),
@@ -756,6 +868,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 27,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New framework learned",
             contentText = "Just completed a project with the new framework",
             tags = listOf("programming", "framework", "learning"),
@@ -768,6 +882,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 28,
             contentUrl = "https://example.com/team_coding.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Team coding session",
             contentText = "Great collaboration with the team today",
             tags = listOf("programming", "teamwork", "collaboration"),
@@ -775,14 +891,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 107,
             insertedAt = Instant.fromEpochSeconds(1637244800),
             viewed = true,
-            user = User(107, "code_artist", "#54A0FF", "+1234567896")
+            user = User(107, "code artist", "#54A0FF", "+1234567896")
         )
     ),
-    // New users added below
     108 to listOf(
         Post(
             id = 29,
             contentUrl = "https://example.com/guitar_solo.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New guitar solo mastered",
             contentText = "Finally nailed that complex solo I've been practicing for weeks",
             tags = listOf("music", "guitar", "practice"),
@@ -790,11 +907,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 108,
             insertedAt = Instant.fromEpochSeconds(1637331200),
             viewed = true,
-            user = User(108, "guitar_hero", "#5F27CD", "+1234567897")
+            user = User(108, "Prosper Obaka", "#5F27CD", "+1234567897")
         ),
         Post(
             id = 30,
             contentUrl = "https://example.com/concert.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Live performance tonight",
             contentText = "Amazing energy from the crowd at our gig",
             tags = listOf("music", "concert", "live"),
@@ -807,6 +926,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 31,
             contentUrl = "https://example.com/new_guitar.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New guitar day!",
             contentText = "Just got this beautiful new electric guitar",
             tags = listOf("music", "guitar", "new"),
@@ -819,6 +940,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 32,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Music theory insights",
             contentText = "Exploring modal interchange in modern music",
             tags = listOf("music", "theory", "learning"),
@@ -826,13 +949,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 108,
             insertedAt = Instant.fromEpochSeconds(1637590400),
             viewed = false,
-            user = User(108, "guitar_hero", "#5F27CD", "+1234567897")
+            user = User(108, "guitar hero", "#5F27CD", "+1234567897")
         )
     ),
     109 to listOf(
         Post(
             id = 33,
             contentUrl = "https://example.com/art_gallery.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Modern art exhibition",
             contentText = "Inspired by the contemporary pieces at the gallery today",
             tags = listOf("art", "exhibition", "modern"),
@@ -840,11 +965,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 109,
             insertedAt = Instant.fromEpochSeconds(1637676800),
             viewed = false,
-            user = User(109, "art_lover", "#FF9F43", "+1234567898")
+            user = User(109, "Saint", "#FF9F43", "+1234567898")
         ),
         Post(
             id = 34,
             contentUrl = "https://example.com/my_painting.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "My latest painting",
             contentText = "Just finished this abstract piece inspired by nature",
             tags = listOf("art", "painting", "abstract"),
@@ -857,6 +984,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 35,
             contentUrl = "https://example.com/art_supplies.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New art supplies haul",
             contentText = "Excited to try out these new high-quality paints and brushes",
             tags = listOf("art", "supplies", "painting"),
@@ -864,13 +993,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 109,
             insertedAt = Instant.fromEpochSeconds(1637849600),
             viewed = false,
-            user = User(109, "art_lover", "#FF9F43", "+1234567898")
+            user = User(109, "art lover", "#FF9F43", "+1234567898")
         )
     ),
     110 to listOf(
         Post(
             id = 36,
             contentUrl = "https://example.com/family_dinner.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Family dinner night",
             contentText = "Nothing beats quality time with loved ones over good food",
             tags = listOf("family", "dinner", "together"),
@@ -878,11 +1009,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 110,
             insertedAt = Instant.fromEpochSeconds(1637936000),
             viewed = true,
-            user = User(110, "family_first", "#00D2D3", "+1234567899")
+            user = User(110, "idrinkgasoline", "#00D2D3", "+1234567899")
         ),
         Post(
             id = 37,
             contentUrl = "https://example.com/family_vacation.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Family vacation memories",
             contentText = "Best family trip ever! The kids had so much fun",
             tags = listOf("family", "vacation", "memories"),
@@ -895,6 +1028,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 38,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Family traditions",
             contentText = "Carrying on our family's holiday traditions this year",
             tags = listOf("family", "traditions", "holidays"),
@@ -902,13 +1037,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 110,
             insertedAt = Instant.fromEpochSeconds(1638108800),
             viewed = true,
-            user = User(110, "family_first", "#00D2D3", "+1234567899")
+            user = User(110, "family first", "#00D2D3", "+1234567899")
         )
     ),
     111 to listOf(
         Post(
             id = 39,
             contentUrl = "https://example.com/fitness_workout.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Morning workout complete",
             contentText = "Crushed my personal best in deadlifts today!",
             tags = listOf("fitness", "workout", "gym"),
@@ -916,11 +1053,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 111,
             insertedAt = Instant.fromEpochSeconds(1638195200),
             viewed = false,
-            user = User(111, "fitness_fanatic", "#FF6B9C", "+1234567900")
+            user = User(111, "7th prince", "#FF6B9C", "+1234567900")
         ),
         Post(
             id = 40,
             contentUrl = "https://example.com/meal_prep.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Weekly meal prep",
             contentText = "Healthy eating made easy with proper planning",
             tags = listOf("fitness", "nutrition", "mealprep"),
@@ -933,6 +1072,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 41,
             contentUrl = "https://example.com/running_trail.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Trail running adventure",
             contentText = "Beautiful 10k run through the forest trails this morning",
             tags = listOf("fitness", "running", "trails"),
@@ -945,6 +1086,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 42,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Fitness journey reflections",
             contentText = "One year into my fitness journey and feeling amazing",
             tags = listOf("fitness", "journey", "progress"),
@@ -952,13 +1095,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 111,
             insertedAt = Instant.fromEpochSeconds(1638454400),
             viewed = true,
-            user = User(111, "fitness_fanatic", "#FF6B9C", "+1234567900")
+            user = User(111, "fitness fanatic", "#FF6B9C", "+1234567900")
         )
     ),
     112 to listOf(
         Post(
             id = 43,
             contentUrl = "https://example.com/game_development.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "New game prototype",
             contentText = "Just finished the core mechanics for my indie game",
             tags = listOf("gaming", "development", "indie"),
@@ -966,11 +1111,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 112,
             insertedAt = Instant.fromEpochSeconds(1638540800),
             viewed = false,
-            user = User(112, "game_dev", "#A29BFE", "+1234567901")
+            user = User(112, "phantom23", "#A29BFE", "+1234567901")
         ),
         Post(
             id = 44,
             contentUrl = "https://example.com/gaming_setup.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Updated gaming setup",
             contentText = "New monitor and mechanical keyboard for the ultimate gaming experience",
             tags = listOf("gaming", "setup", "equipment"),
@@ -983,6 +1130,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 45,
             contentUrl = "https://example.com/game_review.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Latest game review",
             contentText = "My thoughts on the new RPG that just released",
             tags = listOf("gaming", "review", "rpg"),
@@ -990,13 +1139,15 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 112,
             insertedAt = Instant.fromEpochSeconds(1638713600),
             viewed = false,
-            user = User(112, "game_dev", "#A29BFE", "+1234567901")
+            user = User(112, "game dev", "#A29BFE", "+1234567901")
         )
     ),
     113 to listOf(
         Post(
             id = 46,
             contentUrl = "https://example.com/travel_destination.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Next travel destination",
             contentText = "Planning my next adventure to Southeast Asia",
             tags = listOf("travel", "adventure", "planning"),
@@ -1009,6 +1160,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 47,
             contentUrl = "https://example.com/travel_photos.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Travel photography",
             contentText = "Some of my favorite shots from last year's travels",
             tags = listOf("travel", "photography", "memories"),
@@ -1021,6 +1174,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 48,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Travel tips and tricks",
             contentText = "My essential packing list for long-term travel",
             tags = listOf("travel", "tips", "packing"),
@@ -1033,6 +1188,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 49,
             contentUrl = "https://example.com/cultural_experience.mp4",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Cultural immersion",
             contentText = "Learning so much from local traditions and customs",
             tags = listOf("travel", "culture", "learning"),
@@ -1047,6 +1204,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 50,
             contentUrl = "https://example.com/startup_office.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Startup life",
             contentText = "Our team working late to launch our new product",
             tags = listOf("startup", "entrepreneur", "business"),
@@ -1054,11 +1213,13 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
             userId = 114,
             insertedAt = Instant.fromEpochSeconds(1639145600),
             viewed = false,
-            user = User(114, "entrepreneur", "#FD7272", "+1234567903")
+            user = User(114, "Jamiez", "#FD7272", "+1234567903")
         ),
         Post(
             id = 51,
             contentUrl = null,
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Business insights",
             contentText = "Important lessons learned from our first year in business",
             tags = listOf("business", "lessons", "startup"),
@@ -1071,6 +1232,8 @@ val mockPosts: Map<Int, List<Post>> = mapOf(
         Post(
             id = 52,
             contentUrl = "https://example.com/networking_event.jpg",
+            thumbnailUrl = "",
+            thumbnailAt = "",
             description = "Networking event",
             contentText = "Great connections made at today's entrepreneur meetup",
             tags = listOf("business", "networking", "entrepreneur"),
