@@ -68,7 +68,7 @@ class StorageMediaExporter @Inject constructor(
             FileOutputStream(file).use { out ->
                 outputBitmap.compress(
                     Bitmap.CompressFormat.JPEG,
-                    90,
+                    100,
                     out
                 )
             }

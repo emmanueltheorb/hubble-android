@@ -41,6 +41,8 @@ class VideoMediaExporter(
     @OptIn(androidx.media3.common.util.UnstableApi::class)
     override suspend fun exportVideo(
         inputUri: Uri,
+        startMs: Long,
+        endMs: Long,
         overlayTexts: List<TextOverlay>,
         overlayStickers: List<OverlaySticker>,
         outputPath: String
@@ -96,8 +98,18 @@ class VideoMediaExporter(
                 .addListener(transformerListener)
                 .build()
 
+            val clippingConfig = MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(startMs)
+                .setEndPositionMs(endMs)
+                .build()
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(inputUri)
+                .setClippingConfiguration(clippingConfig)
+                .build()
+
             val overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays))
-            val editedMediaItem = EditedMediaItem.Builder(MediaItem.fromUri(inputUri))
+            val editedMediaItem = EditedMediaItem.Builder(mediaItem)
                 .setEffects(Effects(ImmutableList.of(), listOf(overlayEffect)))
                 .build()
 

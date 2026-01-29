@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -52,8 +53,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -69,6 +73,7 @@ import androidx.core.graphics.toColorInt
 import com.orb.hubble.R
 import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.Grey3
+import com.orb.hubble.ui.theme.NunitoFontFamily
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
@@ -81,30 +86,36 @@ fun MessagesSection(
     onMessageDragged: (Message) -> Unit
 ) {
     LazyColumn(
-        modifier = modifier.padding(bottom = bottomPadding)
+        modifier = modifier
+            .padding(bottom = bottomPadding)
     ) {
-        items(messages) { message ->
+        itemsIndexed(messages) { index, message ->
+            val topPadding = if (index == 0) 10 else 0
             MessageItem(
                 message = message,
+                topExtraPadding = topPadding,
                 onMessageDragged = onMessageDragged
             )
         }
     }
 }
+//roma-hexaplaric-trilaterally.ngrok-free.dev/media/media_1767546101460__original.mp4?v=63934765355	https://roma-hexaplaric-trilaterally.ngrok-free.dev/media/media_1767546101460__thumb.jpg?v=63934765355	Test		1	text	["tag1","tag2","tag3"]	2026-01-05T17:02:35Z	3	2026-01-04T17:02:36Z	0	{"id":"3","username":"user2","color":"#817f7f7c","phoneNumber":"08009876543"}
 
-enum class DragState { Left, Right }
+enum class DragState { Left, Idle, Right }
 
 @Composable
 fun MessageItem(
     modifier: Modifier = Modifier,
     message: Message,
+    topExtraPadding: Int,
     onMessageDragged: (Message) -> Unit
 ) {
     val dragState = remember {
         AnchoredDraggableState(
-            initialValue = DragState.Left,
+            initialValue = DragState.Idle,
             anchors = DraggableAnchors {
-                DragState.Left at 0f
+                DragState.Left at -225f
+                DragState.Idle at 0f
                 DragState.Right at 225f
             }
         )
@@ -112,11 +123,11 @@ fun MessageItem(
 
     LaunchedEffect(dragState) {
         snapshotFlow { dragState.settledValue }
-            .collectLatest {
-                if (it == DragState.Right) {
+            .collectLatest { settledState ->
+                if (settledState != DragState.Idle) {
                     onMessageDragged(message)
                     dragState.animateTo(
-                        DragState.Left
+                        DragState.Idle
                     )
                 }
             }
@@ -125,7 +136,7 @@ fun MessageItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 2.7.dp)
+            .padding(top = 2.7.dp + topExtraPadding.dp)
             .padding(bottom = 12.dp)
             .padding(horizontal = 12.dp)
             .offset {
@@ -140,22 +151,47 @@ fun MessageItem(
             )
     ) {
         if (message.repliedTo != null && message.repliedMessage != null) {
+            val userName = "@${message.repliedMessage.user.username} "
+            val content = message.repliedMessage.content
+            val annotatedString = buildAnnotatedString {
+                withStyle(
+                    style = SpanStyle(
+                        //fontStyle = Typography.bodySmall,
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = message.repliedMessage.user.color.toColor()
+                    )
+                ) {
+                    pushStringAnnotation(
+                        tag = userName,
+                        annotation = userName
+                    )
+                    append(userName)
+                }
+                withStyle(
+                    style = SpanStyle(
+                        //fontStyle = Typography.bodySmall,
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = White3
+                    )
+                ) {
+                    pushStringAnnotation(
+                        tag = content,
+                        annotation = content
+                    )
+                    append(content)
+                }
+            }
             Row(
                 modifier = modifier
                     .padding(start = 54.dp)
             ) {
                 Text(
-                    text = "@${message.repliedMessage.user.username}",
-                    fontWeight = FontWeight.Bold,
-                    style = Typography.labelSmall,
-                    color = message.repliedMessage.user.color.toColor()
-                )
-                Spacer(modifier.width(2.7.dp))
-                Text(
-                    text = message.repliedMessage.content,
-                    color = White3,
-                    style = Typography.labelSmall,
-                    maxLines = 1,
+                    text = annotatedString,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }

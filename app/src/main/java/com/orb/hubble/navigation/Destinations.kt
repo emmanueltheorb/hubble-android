@@ -19,7 +19,7 @@ sealed class Dest {
 
     @Serializable
     data class ViewStatusScreen(
-        val userId: Int
+        val userId: String
     ): Dest()
 
     @Serializable

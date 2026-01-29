@@ -23,4 +23,7 @@ interface PostDao {
 
     @Query("SELECT * FROM post ORDER BY userId ASC")
     fun getPostsOrderedByUserId(): Flow<List<Post>>
+
+    @Query("SELECT * FROM post WHERE userId = :userId ORDER BY insertedAt ASC")
+    fun getUserPosts(userId: String): Flow<List<Post>>
 }

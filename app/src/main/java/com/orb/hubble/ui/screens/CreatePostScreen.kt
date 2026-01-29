@@ -5,34 +5,55 @@ import android.util.Log
 import android.widget.Toast
 import android.widget.VideoView
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -50,6 +71,14 @@ import coil3.request.crossfade
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.compose.ContentFrame
+import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
+import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import androidx.media3.ui.compose.state.rememberPresentationState
 import com.orb.hubble.data.CreatePostScreenViewModel
 import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.ui.components.DraggableContainer
@@ -58,16 +87,19 @@ import com.orb.hubble.ui.components.OverlayStickers
 import com.orb.hubble.ui.components.OverlayTextConfig
 import com.orb.hubble.ui.components.OverlayTextField
 import com.orb.hubble.ui.components.TextColorPicker
+import com.orb.hubble.ui.components.getVideoDuration
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black2
 import com.orb.hubble.ui.theme.Typography
+import kotlinx.coroutines.delay
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreatePostScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeScreenViewModel = hiltViewModel(),
+    viewModel: CreatePostScreenViewModel = hiltViewModel(),
     mediaUri: String
 ) {
     val uiState by viewModel.state.collectAsState()
@@ -83,16 +115,41 @@ fun CreatePostScreen(
     val context = LocalContext.current
     val uri = remember { mediaUri.toUri() }
     val isVideo = remember(uri) {
-        uri.path?.contains("video/", true) ?: false
+        val mimeType = context.contentResolver.getType(uri)
+        mimeType?.startsWith("video/", ignoreCase = true) == true
     }
+
+    val thumbnails by viewModel.thumbnails.collectAsState()
+
+    var videoDurationMs by remember { mutableLongStateOf(0L) }
+    var startTime by remember { mutableFloatStateOf(0f) }
+    var endTime by remember { mutableFloatStateOf(90f) }
+
+    val maxVideoDurationSec = (videoDurationMs / 1000f).coerceAtLeast(1f)
+
+    var mediaIntrinsicSize by remember { mutableStateOf(Size.Zero) }
+    var containerSize by remember { mutableStateOf(Size.Zero) }
+
     val videoSizeGetModifier = Modifier
-        .fillMaxSize()
+        .wrapContentSize()
         .onSizeChanged {
             viewModel.updateContainerSize(it)
         }
 
     LaunchedEffect(screenSize) {
         viewModel.updateScreenSize(screenSize)
+    }
+
+    LaunchedEffect(uri) {
+        if (isVideo) {
+            val durationMs = getVideoDuration(context, uri)
+            videoDurationMs = durationMs
+
+            startTime = 0f
+            endTime = 90f.coerceAtMost(durationMs / 1000f)
+
+            viewModel.generateThumbnails(context, uri)
+        }
     }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -120,60 +177,160 @@ fun CreatePostScreen(
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged {
+                containerSize = Size(it.width.toFloat(), it.height.toFloat())
                 // Optionally track if the screen size changes
                 viewModel.updateScreenSize(it)
             },
         contentAlignment = Alignment.Center
     ) {
-        Box {
+        Column(
+            modifier = Modifier
+                .padding(top = 50.dp)
+        ) {
             if (isVideo) {
-                VideoPlayer(
-                    modifier = videoSizeGetModifier,
-                    uri = uri
-                )
-            } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(mediaUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Selected image",
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .onSizeChanged {
-                            viewModel.updateContainerSize(it)
+                        .fillMaxWidth()
+                        .height(60.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        thumbnails.forEach { bitmap ->
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = fadeIn()
+                            ) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         }
+                    }
+                    RangeSlider(
+                        value = startTime..endTime,
+                        modifier = Modifier.fillMaxSize(),
+                        onValueChange = { range ->
+                            val newStart = range.start.coerceIn(0f, maxVideoDurationSec)
+                            val newEnd = range.endInclusive.coerceIn(0f, maxVideoDurationSec)
+
+                            if (newEnd >= newStart) {
+                                val difference = newEnd - newStart
+                                if (difference > 90) {
+                                    if (range.start != startTime) {
+                                        startTime = newStart
+                                        endTime = (newStart + 90).coerceAtMost(maxVideoDurationSec)
+                                    } else {
+                                        endTime = newEnd
+                                        startTime = (newEnd - 90).coerceAtLeast(0f)
+                                    }
+                                } else {
+                                    startTime = newStart
+                                    endTime = newEnd
+                                }
+                            }
+                        },
+                        valueRange = 0f..1f.coerceAtLeast(maxVideoDurationSec),
+                        steps = 0,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color.Transparent,
+                            inactiveTrackColor = Color.Black.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+            }
+            Box {
+                if (isVideo) {
+                    VideoPlayer(
+                        modifier = videoSizeGetModifier,
+                        uri = uri,
+                        startTimeMs = (startTime * 1000).toLong(),
+                        endTimeMs = (endTime * 1000).toLong()
+                    )
+                } else {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(mediaUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Selected image",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onSizeChanged {
+                                viewModel.updateContainerSize(it)
+                            },
+                        onSuccess = { state ->
+                            mediaIntrinsicSize = state.painter.intrinsicSize
+                        }
+                    )
+                }
+                DraggableContainer(
+                    children = uiState.overlayTexts,
+                    stickers = uiState.overlayStickers,
+                    overlayInteraction = uiState.overlayInteraction,
+                    onChildTransformChanged = { id, offset, rotation, scale ->
+                        // 3. Calculate Image Rect
+                        val contentRect = calculateContentRect(containerSize, mediaIntrinsicSize)
+                        if (contentRect != Rect.Zero) {
+                            // Calculate offset relative to the image top-left
+                            // Calculate how far the child is into the image as a PERCENTAGE (0.0 to 1.0)
+                            val relativeRatioX = (offset.x - contentRect.left) / contentRect.width
+                            val relativeRatioY = (offset.y - contentRect.top) / contentRect.height
+
+                            viewModel.transformOverlayText(
+                                id = id,
+                                offset = offset,
+                                positionX = relativeRatioX,
+                                positionY = relativeRatioY,
+                                rotation = rotation,
+                                scale = scale
+                            )
+                        }
+                    },
+                    onStickerTransformChanged = { id, offset, rotation, scale, parentSize, currentStickerSize ->
+                        val contentRect = calculateContentRect(containerSize, mediaIntrinsicSize)
+
+                        if (contentRect != Rect.Zero && contentRect.width > 0f) {
+                            val relativeRatioX = (offset.x - contentRect.left) / contentRect.width
+                            val relativeRatioY = (offset.y - contentRect.top) / contentRect.height
+
+                            val normalizedWidth = (currentStickerSize.width * scale) / contentRect.width
+
+                            viewModel.transformOverlaySticker(
+                                id = id,
+                                offset = offset,
+                                renderOffset = Offset(x = relativeRatioX, y = relativeRatioY),
+                                rotation = rotation,
+                                scale = scale,
+                                parentSize = parentSize,
+                                normalizedWidth = normalizedWidth
+                            )
+                        }
+
+//                    viewModel.transformOverlaySticker(
+//                        id = id,
+//                        offset = offset,
+//                        rotation = rotation,
+//                        scale = scale,
+//                        parentSize = parentSize,
+//                        currentStickerBaseSize = currentStickerSize
+//                    )
+                    },
+                    onChildClick = {
+                        viewModel.selectOverlay(it)
+                        editing.value = true
+                    },
+                    modifier = Modifier
+                        .matchParentSize()
                 )
             }
-            DraggableContainer(
-                children = uiState.overlayTexts,
-                stickers = uiState.overlayStickers,
-                overlayInteraction = uiState.overlayInteraction,
-                onChildTransformChanged = { id, offset, rotation, scale ->
-                    viewModel.transformOverlayText(
-                        id = id,
-                        offset = offset,
-                        rotation = rotation,
-                        scale = scale
-                    )
-                },
-                onStickerTransformChanged = { id, offset, rotation, scale, parentSize, currentStickerSize ->
-                    viewModel.transformOverlaySticker(
-                        id = id,
-                        offset = offset,
-                        rotation = rotation,
-                        scale = scale,
-                        parentSize = parentSize,
-                        currentStickerBaseSize = currentStickerSize
-                    )
-                },
-                onChildClick = {
-                    viewModel.selectOverlay(it)
-                    editing.value = true
-                },
-                modifier = Modifier
-                    .matchParentSize()
-            )
+
         }
         TextButton(
             onClick = {
@@ -211,7 +368,12 @@ fun CreatePostScreen(
         }
         TextButton(
             onClick = {
-                viewModel.saveMedia(uri, context)
+                viewModel.saveMedia(
+                    uri,
+                    context,
+                    startMs = (startTime * 1000).toLong(),
+                    endMs = (endTime * 1000).toLong()
+                )
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -308,25 +470,75 @@ fun CreatePostScreen(
     }
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayer(
     modifier: Modifier,
-    uri: Uri
+    uri: Uri,
+    startTimeMs: Long,
+    endTimeMs: Long
 ) {
     val context = LocalContext.current
+    val mediaItem = MediaItem.fromUri(uri)
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build()
+    }
 
-    AndroidView(
-        factory = { context ->
-            VideoView(context).apply {
-                setVideoURI(uri)
-                setOnPreparedListener { mediaPlayer ->
-                    mediaPlayer.isLooping = true
-                    start()
-                }
+    LaunchedEffect(uri, startTimeMs, endTimeMs) {
+        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+        exoPlayer.prepare()
+        exoPlayer.seekTo(startTimeMs)
+        exoPlayer.playWhenReady = true
+    }
+
+    LaunchedEffect(exoPlayer, startTimeMs, endTimeMs) {
+        while (true) {
+            if (exoPlayer.currentPosition >= endTimeMs) {
+                exoPlayer.pause()
+                exoPlayer.seekTo(startTimeMs)
+                exoPlayer.playWhenReady = true
             }
-        },
-        modifier = modifier
-    )
+            delay(500)
+        }
+    }
+
+    DisposableEffect(Unit) {
+
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    Box {
+        ContentFrame(
+            player = exoPlayer
+        )
+//        Box(
+//            modifier = Modifier
+//                .matchParentSize()
+//                .pointerInput(Unit) {
+//                    awaitPointerEventScope {
+//                        while (true) {
+//                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+//                            event.changes.forEach { it.consume() }
+//                        }
+//                    }
+//                }
+//        )
+    }
+
+//    AndroidView(
+//        factory = { context ->
+//            VideoView(context).apply {
+//                setVideoURI(uri)
+//                setOnPreparedListener { mediaPlayer ->
+//                    mediaPlayer.isLooping = true
+//                    start()
+//                }
+//            }
+//        },
+//        modifier = modifier
+//    )
 }
 
 @Composable
@@ -390,6 +602,26 @@ fun TextEditor(
     }
 }
 
+fun calculateContentRect(containerSize: Size, mediaSize: Size): Rect {
+    if (containerSize == Size.Zero || mediaSize == Size.Zero) return Rect.Zero
+
+    val scale = min(
+        containerSize.width / mediaSize.width,
+        containerSize.height / mediaSize.height
+    )
+
+    val displayedWidth = mediaSize.width * scale
+    val displayedHeight = mediaSize.height * scale
+
+    val offsetX = (containerSize.width - displayedWidth) / 2
+    val offsetY = (containerSize.height - displayedHeight) / 2
+
+    return Rect(
+        offset = Offset(offsetX, offsetY),
+        size = Size(displayedWidth, displayedHeight)
+    )
+}
+
 sealed class StickerSource {
     data class Resource(val resId: Int) : StickerSource()
     data class Uri(val uri: android.net.Uri) : StickerSource()
@@ -402,6 +634,8 @@ data class OverlaySticker(
     val source: StickerSource,
     val offsetRatioX: Float = 0f,
     val offsetRatioY: Float = 0f,
+    val positionX: Float = 0f,
+    val positionY: Float = 0f,
     val rotation: Float = 0f,
     val scale: Float = 1f,
     val alpha: Float = 1f,
@@ -414,6 +648,8 @@ data class TextOverlay(
     val fontSize: TextUnit = 36.sp,
     val offsetRatioX: Float = 0f,
     val offsetRatioY: Float = 0f,
+    val positionX: Float = 0f,
+    val positionY: Float = 0f,
     val rotation: Float = 0f,
     val scale: Float = 1f,
     val config: OverlayTextConfig

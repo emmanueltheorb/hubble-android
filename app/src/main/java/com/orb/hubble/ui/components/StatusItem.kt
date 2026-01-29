@@ -61,7 +61,7 @@ fun StatusItem(
     modifier: Modifier = Modifier,
     posts: List<Post>,
     username: String,
-    onStatusClicked: (Int) -> Unit
+    onStatusClicked: (String) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(

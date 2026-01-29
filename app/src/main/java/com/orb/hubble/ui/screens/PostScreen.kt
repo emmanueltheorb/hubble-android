@@ -74,6 +74,7 @@ fun PostScreen(
 ) {
     val context = LocalActivity.current
     var hasPermissions by remember { mutableStateOf(false) }
+    var goBack by remember { mutableStateOf(false) }
 
     val bottomPadding =
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
@@ -97,6 +98,7 @@ fun PostScreen(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasPermissions = permissions.all { it.value }
+        if (!hasPermissions) goBack = true
     }
 
     // Check permissions on launch
@@ -143,7 +145,8 @@ fun PostScreen(
         if (postType == "Text") {
 
         }
-    } else {
+    }
+    if (goBack) {
         onNavigate()
         Text("Permissions required to access media")
     }

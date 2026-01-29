@@ -3,6 +3,7 @@ package com.orb.hubble.di
 import android.content.Context
 import androidx.room.Room
 import com.orb.hubble.data.CacheStorageStrategy
+import com.orb.hubble.data.MessageDao
 import com.orb.hubble.data.PostDao
 import com.orb.hubble.data.PostDatabase
 import com.orb.hubble.data.StorageMediaExporter
@@ -64,10 +65,14 @@ object AppModule {
     @Provides
     fun providePostDatabase(@ApplicationContext context: Context): PostDatabase =
         Room.databaseBuilder(context, PostDatabase::class.java, "post.db")
+            .addMigrations(PostDatabase.migration4to5)
             .build()
 
     @Provides
     fun providePostDao(database: PostDatabase): PostDao = database.postDao
+
+    @Provides
+    fun provideMessageDao(database: PostDatabase): MessageDao = database.messageDao
 
     @Provides
     @Singleton

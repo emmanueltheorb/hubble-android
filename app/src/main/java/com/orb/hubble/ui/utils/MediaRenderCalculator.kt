@@ -42,8 +42,8 @@ class MediaRenderCalculator(
         val (scaleX, scaleY, bitmapScale) = scaleFactors
 
         val scaledOffset = Offset(
-            x = (overlayText.offsetRatioX * templateSize.width) * scaleX,
-            y = (overlayText.offsetRatioY * templateSize.height) * scaleY
+            x = (overlayText.positionX * templateSize.width) * scaleX,
+            y = (overlayText.positionY * templateSize.height) * scaleY
         )
 
         val textPaddingPx = TEXT_PADDING_DP * density
@@ -93,8 +93,8 @@ class MediaRenderCalculator(
         // The overlaySticker.offset is Top-Left.
         // We need to find the Center point for the Canvas rotation logic.
         // CenterX = TopLeftX + (Width / 2)
-        val topLeftX = (overlaySticker.offsetRatioX * templateSize.width) * scaleX
-        val topLeftY = (overlaySticker.offsetRatioY * templateSize.height) * scaleY
+        val topLeftX = (overlaySticker.positionX * templateSize.width) * scaleX
+        val topLeftY = (overlaySticker.positionY * templateSize.height) * scaleY
 
         // Note: We use targetStickerWidthPx for centering offset
         // Assuming aspect ratio is preserved, Height is derived later,

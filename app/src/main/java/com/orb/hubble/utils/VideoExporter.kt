@@ -7,6 +7,8 @@ import com.orb.hubble.ui.screens.TextOverlay
 interface VideoExporter {
     suspend fun exportVideo(
         inputUri: Uri,
+        startMs: Long,
+        endMs: Long,
         overlayTexts: List<TextOverlay>,
         overlayStickers: List<OverlaySticker>,
         outputPath: String

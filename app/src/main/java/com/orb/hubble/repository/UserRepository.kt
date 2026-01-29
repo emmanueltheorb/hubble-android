@@ -22,11 +22,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface UserRepository {
-    val followedUsers: StateFlow<List<Int>>
-    val contacts: StateFlow<List<Int>>
+    val followedUsers: StateFlow<List<String>>
+    val contacts: StateFlow<List<String>>
 
-    suspend fun getFollowedUsers(userId: Int)
-    suspend fun getContacts(userId: Int)
+    suspend fun getFollowedUsers(userId: String)
+    suspend fun getContacts(userId: String)
 }
 
 @Singleton
@@ -34,11 +34,11 @@ class UserRepositoryImpl @Inject constructor(
     private val websocketService: WebsocketService // Your API service
 ) : UserRepository {
 
-    private val _followedUsers = MutableStateFlow<List<Int>>(emptyList())
-    override val followedUsers: StateFlow<List<Int>> = _followedUsers.asStateFlow()
+    private val _followedUsers = MutableStateFlow<List<String>>(emptyList())
+    override val followedUsers: StateFlow<List<String>> = _followedUsers.asStateFlow()
 
-    private val _contacts = MutableStateFlow<List<Int>>(emptyList())
-    override val contacts: StateFlow<List<Int>> = _contacts.asStateFlow()
+    private val _contacts = MutableStateFlow<List<String>>(emptyList())
+    override val contacts: StateFlow<List<String>> = _contacts.asStateFlow()
 
     init {
         observeWebSocketEvents()
@@ -76,15 +76,15 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFollowedUsers(userId: Int) {
+    override suspend fun getFollowedUsers(userId: String) {
         websocketService.sendEvent(ClientEvent.GetFollowedUsers(userId))
     }
 
-    override suspend fun getContacts(userId: Int) {
+    override suspend fun getContacts(userId: String) {
         websocketService.sendEvent(ClientEvent.GetContacts(userId))
     }
 
-    private suspend fun getContactsFromPhonebook(): List<Int> {
+    private suspend fun getContactsFromPhonebook(): List<String> {
         // Implement phonebook contact matching
         // This would:
         // 1. Read contacts from phonebook

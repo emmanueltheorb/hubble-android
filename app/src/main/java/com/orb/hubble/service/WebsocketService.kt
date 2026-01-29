@@ -50,7 +50,7 @@ class WebsocketService @Inject constructor() {
     private var websocketSession: DefaultClientWebSocketSession? = null
     private var job: Job? = null
 
-    suspend fun connect(userId: Int, url: String = "wss://roma-hexaplaric-trilaterally.ngrok-free.dev/ws") {
+    suspend fun connect(userId: String, url: String = "wss://roma-hexaplaric-trilaterally.ngrok-free.dev/ws") {
         try {
             client.webSocket("$url?user_id=$userId") {
                 websocketSession = this
@@ -133,13 +133,13 @@ class WebsocketService @Inject constructor() {
                     _events.emit(WebsocketEvent.PostMessage(message = message))
                 }
                 "followed_ids" -> {
-                    val list = json.decodeFromJsonElement<List<Int>>(
+                    val list = json.decodeFromJsonElement<List<String>>(
                         jsonObject["followedUsers"] ?: return
                     )
                     _events.emit(WebsocketEvent.FollowedUsers(followedUsers = list))
                 }
                 "contact_ids" -> {
-                    val list = json.decodeFromJsonElement<List<Int>>(
+                    val list = json.decodeFromJsonElement<List<String>>(
                         jsonObject["contacts"] ?: return
                     )
                     _events.emit(WebsocketEvent.Contacts(contacts = list))

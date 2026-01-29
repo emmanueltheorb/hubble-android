@@ -34,9 +34,9 @@ import com.orb.hubble.ui.components.OverlayTextConfig
 import com.orb.hubble.ui.components.StatusIndicatorExamples
 import com.orb.hubble.ui.components.StatusItem
 import com.orb.hubble.ui.components.StatusView
+import com.orb.hubble.ui.components.VideoCropper
 import com.orb.hubble.ui.screens.HomeScreen
 import com.orb.hubble.ui.screens.PostScreen
-import com.orb.hubble.ui.screens.TestScreen
 import com.orb.hubble.ui.screens.TextEditor
 import com.orb.hubble.ui.screens.TextOverlay
 import com.orb.hubble.ui.screens.ViewStatusScreen
@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             WindowCompat.setDecorFitsSystemWindows(window,false)
             HubbleTheme {
+                //ViewStatusScreen()
                 MyNavigationHost()
 //                Box(
 //                    modifier = Modifier.fillMaxSize(),

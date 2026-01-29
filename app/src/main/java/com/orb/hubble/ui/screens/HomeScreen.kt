@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,9 +66,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    userId: Int = 3,
+    userId: String = "3",
     viewModel: HomeScreenViewModel = hiltViewModel(),
-    navToViewStatusScreen: (Int) -> Unit,
+    navToViewStatusScreen: (String) -> Unit,
     navToAddPostScreen: () -> Unit
 ) {
     val uiState by viewModel.state.collectAsState()
@@ -179,7 +180,7 @@ fun MyStatus(
     user: User,
     posts: List<Post> = emptyList(),
     onAddPostClicked: () -> Unit,
-    onViewStatusClicked: (Int) -> Unit
+    onViewStatusClicked: (String) -> Unit
 ) {
     if (posts == emptyList<Post>()) {
         Row(
@@ -314,56 +315,30 @@ fun SelectableText(
 fun Posts(
     modifier: Modifier = Modifier,
     state: PagerState,
-    filteredPosts: Map<Int, List<Post>>,
-    navToViewStatusScreen: (Int) -> Unit
+    filteredPosts: Map<String, List<Post>>,
+    navToViewStatusScreen: (String) -> Unit
 ) {
     HorizontalPager(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(900.dp),
         beyondViewportPageCount = 0,
         state = state
     ) { page ->
-        when (page) {
-            0 -> Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                filteredPosts.entries.forEach { (_, postList) ->
-                    StatusItem(
-                        posts = postList,
-                        username = postList[0].user.username,
-                        onStatusClicked = { userId ->
-                            navToViewStatusScreen(userId)
-                        }
-                    )
-                }
-            }
-            1 -> Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                filteredPosts.entries.forEach { (_, postList) ->
-                    StatusItem(
-                        posts = postList,
-                        username = postList[0].user.username,
-                        onStatusClicked = { userId ->
-                            navToViewStatusScreen(userId)
-                        }
-                    )
-                }
-            }
-            2 -> Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                filteredPosts.entries.forEach { (_, postList) ->
-                    StatusItem(
-                        posts = postList,
-                        username = postList[0].user.username,
-                        onStatusClicked = { userId ->
-                            navToViewStatusScreen(userId)
-                        }
-                    )
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(900.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
+        ) {
+            filteredPosts.entries.forEach { (_, postList) ->
+                StatusItem(
+                    posts = postList,
+                    username = postList[0].user.username,
+                    onStatusClicked = { userId ->
+                        navToViewStatusScreen(userId)
+                    }
+                )
             }
         }
     }

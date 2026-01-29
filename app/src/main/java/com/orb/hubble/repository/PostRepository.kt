@@ -40,12 +40,13 @@ class PostRepository(
         httpClient.submitFormWithBinaryData(
             url = "https://roma-hexaplaric-trilaterally.ngrok-free.dev/api/upload",
             formData = formData {
-                append("user_id", 3)
+                append("user_id", "f1961098-22e1-4fd0-a0f1-7e61c21d120f")
                 append("description", "Test")
                 append("content_text", "")
                 append("content_url", "")
                 append("thumbnail_url", "")
                 append("thumbnail_at", "1")
+                append("type", "video")
                 tags.forEach { tag ->
                     append("tags[]", tag)
                 }
@@ -76,7 +77,7 @@ data class ProgressUpdate(
 
 @Serializable
 data class UploadResponse(
-    val id: Int,
+    val id: String,
     val description: String,
     @SerialName("content_url")
     val contentUrl: String

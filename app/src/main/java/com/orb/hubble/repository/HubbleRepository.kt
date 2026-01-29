@@ -5,6 +5,8 @@ import com.orb.hubble.data.Contact
 import com.orb.hubble.data.CreatePostRequest
 import com.orb.hubble.data.FollowRequest
 import com.orb.hubble.data.Message
+import com.orb.hubble.data.MessageDao
+import com.orb.hubble.data.MessageWithReply
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.PostDao
 import com.orb.hubble.data.PostMessageRequest
@@ -26,11 +28,13 @@ import kotlin.time.Instant
 class HubbleRepository @Inject constructor(
     private val websocketService: WebsocketService,
     private val postDao: PostDao,
-    @ApplicationScope private val externalScope: CoroutineScope
+    private val messagesDao: MessageDao,
+    @param:ApplicationScope private val externalScope: CoroutineScope
 ) {
 
     init {
         observeAndPersistPosts()
+        observeAndPersistMessages()
     }
 
     val connectionState: Flow<WebsocketEvent> = websocketService.events
@@ -48,7 +52,27 @@ class HubbleRepository @Inject constructor(
             .launchIn(externalScope) // Crucial: This runs independently of any ViewModel
     }
 
+    private fun observeAndPersistMessages() {
+        websocketService.events
+            .onEach { event ->
+                when (event) {
+                    is WebsocketEvent.PostMessage -> messagesDao.upsertMessage(event.message)
+                    else -> Unit
+                }
+            }
+            .launchIn(externalScope)
+    }
+
     fun getAllPosts(): Flow<List<Post>> = postDao.getPostsOrderedByTimestamp()
+
+    fun getUserPosts(userId: String): Flow<List<Post>> = postDao.getUserPosts(userId)
+
+    fun getAllMessages(postId: String): Flow<List<Message>> = messagesDao.getMessagesForPost(postId)
+        .map { messagesWithReplies ->
+            messagesWithReplies.map { item ->
+                item.message.copy(repliedMessage = item.repliedMessage)
+            }
+        }
 
 //    val newPosts: Flow<Post> = websocketService.events
 //        .map { event ->
@@ -68,16 +92,16 @@ class HubbleRepository @Inject constructor(
 //        }
 //        .filterNotNull()
 
-    val messages: Flow<Message> = websocketService.events
-        .map { event ->
-            when (event) {
-                is WebsocketEvent.PostMessage -> event.message
-                else -> null
-            }
-        }
-        .filterNotNull()
+//    val messages: Flow<Message> = websocketService.events
+//        .map { event ->
+//            when (event) {
+//                is WebsocketEvent.PostMessage -> event.message
+//                else -> null
+//            }
+//        }
+//        .filterNotNull()
 
-    suspend fun connect(userId: Int) {
+    suspend fun connect(userId: String) {
         websocketService.connect(userId)
     }
 
@@ -86,7 +110,7 @@ class HubbleRepository @Inject constructor(
     }
 
     @OptIn(ExperimentalTime::class)
-    suspend fun joinPost(postId: Int, from: Instant? = null) {
+    suspend fun joinPost(postId: String, from: Instant? = null) {
         websocketService.sendEvent(ClientEvent.JoinPost(postId, from))
     }
 

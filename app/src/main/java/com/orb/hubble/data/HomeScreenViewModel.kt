@@ -26,6 +26,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -60,10 +63,14 @@ class HomeScreenViewModel @Inject constructor(
     private val shareSheet: StorageShareSheet,
     private val postRepository: PostRepository
 ) : ViewModel() {
-    private var uploadJob: Job? = null
-
     private val _state = MutableStateFlow(HomeScreenState())
     val state: StateFlow<HomeScreenState> = _state.asStateFlow()
+
+    private val _isLoadingPosts = MutableStateFlow(true)
+    val isLoadingPosts: StateFlow<Boolean> = _isLoadingPosts.asStateFlow()
+
+    private val _currentPostId = MutableStateFlow<String?>(null)
+    private val _currentPostUserId = MutableStateFlow<String?>(null)
 
     // Add these to your ViewModel
     private val _selectedTab = MutableStateFlow(PostFilterTab.ALL)
@@ -76,8 +83,44 @@ class HomeScreenViewModel @Inject constructor(
             emptyList()
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val messagesFromDb = _currentPostId
+        .flatMapLatest { postId ->
+            if (postId.isNullOrEmpty()) {
+                flowOf(emptyList())
+            } else {
+                repository.getAllMessages(postId)
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val userPosts = _currentPostUserId
+        .flatMapLatest { userId ->
+            if (userId.isNullOrEmpty()) {
+                flowOf(emptyList())
+            } else {
+                repository.getUserPosts(userId)
+                    .onStart { _isLoadingPosts.value = true }
+                    .onEach { _isLoadingPosts.value = false }
+                    .catch {
+                        _isLoadingPosts.value = false
+                        emit(emptyList())
+                    }
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
     // Filter posts based on current tab
-    val filteredPosts: StateFlow<Map<Int, List<Post>>> =
+    val filteredPosts: StateFlow<Map<String, List<Post>>> =
         combine(_state, _selectedTab, postsFromDb) { state, tab, posts ->
             val postMap = posts.groupBy { it.userId }
 
@@ -95,8 +138,8 @@ class HomeScreenViewModel @Inject constructor(
     init {
         connect()
         observeConnectionState()
-        observePosts()
-        observeMessages()
+        //observePosts()
+        //observeMessages()
         observeUserRelations()
     }
 
@@ -178,9 +221,9 @@ class HomeScreenViewModel @Inject constructor(
     }
 
     private fun updatePostsList(
-        postsList: Map<Int, List<Post>>,
+        postsList: Map<String, List<Post>>,
         post: Post
-    ): Map<Int, List<Post>> {
+    ): Map<String, List<Post>> {
         val userPosts = postsList[post.userId] ?: emptyList()
 
         val updatedUserPosts = (userPosts + post)
@@ -194,9 +237,9 @@ class HomeScreenViewModel @Inject constructor(
     }
 
     private fun updateMessageList(
-        messagesList: Map<Int, List<Message>>,
+        messagesList: Map<String, List<Message>>,
         message: Message
-    ): Map<Int, List<Message>> {
+    ): Map<String, List<Message>> {
         val postMessages = messagesList[message.postId] ?: emptyList()
 
         val updatedPostMessages = (postMessages + message)
@@ -204,29 +247,33 @@ class HomeScreenViewModel @Inject constructor(
         return messagesList + (message.postId to updatedPostMessages)
     }
 
-    private fun observeMessages() {
-        repository.messages
-            .onEach { message ->
-                _state.update { currentState ->
-                    val updatedMessagesList = updateMessageList(
-                        currentState.messagesList,
-                        message
-                    )
+//    private fun observeMessages() {
+//        repository.messages
+//            .onEach { message ->
+//                _state.update { currentState ->
+//                    val updatedMessagesList = updateMessageList(
+//                        currentState.messagesList,
+//                        message
+//                    )
+//
+//                    currentState.copy(
+//                        messagesList = updatedMessagesList
+//                    )
+//                }
+//            }
+//            .launchIn(viewModelScope)
+//    }
 
-                    currentState.copy(
-                        messagesList = updatedMessagesList
-                    )
-                }
-            }
-            .launchIn(viewModelScope)
-    }
-
-    fun setUserId(userId: Int) {
+    fun setUserId(userId: String) {
         _state.update {
             it.copy(
                 userId = userId
             )
         }
+    }
+
+    fun setPostUserId(userId: String) {
+        _currentPostUserId.value = userId
     }
 
     fun connect() {
@@ -237,7 +284,8 @@ class HomeScreenViewModel @Inject constructor(
     }
 
     @OptIn(ExperimentalTime::class)
-    fun joinPost(postId: Int, from: Instant?) {
+    fun joinPost(postId: String, from: Instant?) {
+        _currentPostId.value = postId
         viewModelScope.launch {
             repository.joinPost(postId, from)
         }
@@ -261,7 +309,7 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
-    fun sendMessage(content: String, postId: Int, userId: Int, repliedTo: Int? = null) {
+    fun sendMessage(content: String, postId: String, userId: String, repliedTo: String? = null) {
         viewModelScope.launch {
             repository.sendMessage(
                 PostMessageRequest(
@@ -325,344 +373,6 @@ class HomeScreenViewModel @Inject constructor(
 //            repository.disconnect()
 //        }
 //    }
-
-    fun uploadFile(filePath: String, fileName: String) {
-        uploadJob = postRepository
-            .uploadFile(filePath, fileName)
-            .onStart {
-
-                _state.update {
-                    it.copy(
-                        isUploading = true,
-                        isUploadComplete = false,
-                        errorMessage = null,
-                        progress = 0f
-                    )
-                }
-            }
-            .onEach { progressUpdate ->
-                _state.update {
-                    val calculatedProgress = if (progressUpdate.totalBytes > 0) {
-                        progressUpdate.bytesSent / progressUpdate.totalBytes.toFloat()
-                    } else 0f
-                    it.copy(
-                        progress = calculatedProgress
-                    )
-                }
-            }
-            .onCompletion { cause ->
-                if (cause == null) {
-                    _state.update {
-                        it.copy(
-                            isUploading = false,
-                            isUploadComplete = true
-                        )
-                    }
-                } else if (cause is CancellationException) {
-                    _state.update {
-                        it.copy(
-                            isUploading = false,
-                            errorMessage = "The upload was cancelled!",
-                            isUploadComplete = false,
-                            progress = 0f
-                        )
-                    }
-                }
-            }
-            .catch { cause ->
-                Log.e("UploadError", "Full exception: ", cause)
-                val message = when (cause) {
-                    is OutOfMemoryError -> "File too large!"
-                    is FileNotFoundException -> "File not found!"
-                    is UnresolvedAddressException -> "No internet!"
-                    else -> "${cause.message}"
-                }
-                _state.update {
-                    it.copy(
-                        isUploading = false,
-                        errorMessage = message
-                    )
-                }
-            }
-            .launchIn(viewModelScope)
-    }
-
-    fun cancelUpload() {
-        uploadJob?.cancel()
-    }
-
-    fun transformOverlayText(
-        id: String,
-        offset: Offset,
-        rotation: Float,
-        scale: Float
-    ) {
-        _state.update {
-            val (width, height) = it.mediaSize
-            it.copy(
-                overlayTexts = it.overlayTexts.map { overlayText ->
-                    if (overlayText.id == id) {
-                        overlayText.copy(
-                            offsetRatioX = offset.x / width,
-                            offsetRatioY = offset.y / height,
-                            rotation = rotation,
-                            scale = scale
-                        )
-                    } else overlayText
-                }
-            )
-        }
-    }
-
-    fun transformOverlaySticker(
-        id: String,
-        offset: Offset,
-        rotation: Float,
-        scale: Float,
-        parentSize: Size,
-        currentStickerBaseSize: Size
-    ) {
-        _state.update {
-            val (width, height) = parentSize
-            it.copy(
-                overlayStickers = it.overlayStickers.map { overlaySticker ->
-                    // Calculate the current visual width relative to the parent width
-                    val relativeWidth = (currentStickerBaseSize.width * scale) / width
-
-                    if (overlaySticker.id == id) {
-                        overlaySticker.copy(
-                            offsetRatioX = offset.x / width,
-                            offsetRatioY = offset.y / height,
-                            rotation = rotation,
-                            scale = scale,
-                            normalizedWidth = relativeWidth // Store the essential size data
-                        )
-                    } else overlaySticker
-                }
-            )
-        }
-    }
-
-    @OptIn(ExperimentalUuidApi::class)
-    fun addText() {
-        val id = Uuid.random().toString()
-
-        val overlayText = TextOverlay(
-            id = id,
-            text = "",
-            offsetRatioX = 0.45f,
-            offsetRatioY = 0.48f,
-            config = OverlayTextConfig(
-                textStyle = TextStyle(
-                    fontSize = 24.sp,
-                    fontFamily = NunitoFontFamily,
-                    textAlign = TextAlign.Center,
-                    color = Color.Black
-                ),
-                fieldStyle = FieldStyle.Filled,
-                containerColor = Color.White
-            )
-        )
-
-        _state.update {
-            it.copy(
-                overlayTexts = it.overlayTexts + overlayText,
-                overlayInteraction = OverlayInteraction.Selected(id),
-                selectedTextOverlay = overlayText
-            )
-        }
-    }
-
-    fun addSticker(sticker: OverlaySticker) {
-        _state.update {
-            it.copy(
-                overlayStickers = it.overlayStickers + sticker
-            )
-        }
-    }
-
-    fun deleteOverlay(id: String) {
-        _state.update {
-            it.copy(
-                overlayTexts = it.overlayTexts.filter { overlayText ->
-                    overlayText.id != id
-                }
-            )
-        }
-    }
-
-    fun selectOverlay(id: String) {
-        _state.update {
-            it.copy(
-                overlayInteraction = OverlayInteraction.Selected(id),
-                selectedTextOverlay = it.overlayTexts.first { overlayText ->
-                    overlayText.id == id
-                }
-            )
-        }
-    }
-
-    fun updateText(id: String, text: String) {
-        _state.update {
-//            it.copy(
-//                overlayTexts = it.overlayTexts.map { overlayText ->
-//                    if (overlayText.id == id) {
-//                        overlayText.copy(
-//                            text = text
-//                        )
-//                    } else overlayText
-//                }
-//            )
-            val updatedOverlayTexts = it.overlayTexts.map { overlayText ->
-                if (overlayText.id == id) {
-                    overlayText.copy(text = text)
-                } else overlayText
-            }
-
-            // Also update selectedTextOverlay if it's the same id
-            val updatedSelectedOverlay = if (it.selectedTextOverlay.id == id) {
-                it.selectedTextOverlay.copy(text = text)
-            } else it.selectedTextOverlay
-
-            it.copy(
-                overlayTexts = updatedOverlayTexts,
-                selectedTextOverlay = updatedSelectedOverlay
-            )
-        }
-    }
-
-    fun changeColor(id: String, color: Color) {
-        _state.update {
-            val updatedOverlayTexts = it.overlayTexts.map { overlayText ->
-                if (overlayText.id == id) {
-                    overlayText.copy(
-                        config = overlayText.config.copy(containerColor = color)
-                    )
-                } else overlayText
-            }
-
-            // Also update selectedTextOverlay if it's the same id
-            val updatedSelectedOverlay = if (it.selectedTextOverlay.id == id) {
-                it.selectedTextOverlay.copy(
-                    config = it.selectedTextOverlay.config.copy(containerColor = color)
-                )
-            } else it.selectedTextOverlay
-
-            it.copy(
-                overlayTexts = updatedOverlayTexts,
-                selectedTextOverlay = updatedSelectedOverlay
-            )
-        }
-    }
-
-    fun updateTextConfig(id: String, config: OverlayTextConfig) {
-        _state.update {
-            it.copy(
-                overlayTexts = it.overlayTexts.map { overlayText ->
-                    if (overlayText.id == id) {
-                        overlayText.copy(config = config)
-                    } else overlayText
-                }
-            )
-        }
-    }
-
-    fun editOverlay(id: String) {
-        _state.update {
-            it.copy(
-                overlayInteraction = OverlayInteraction.Editing(id)
-            )
-        }
-    }
-
-    fun doneEditing() {
-        _state.update {
-            it.copy(
-                overlayInteraction = OverlayInteraction.None
-            )
-        }
-    }
-
-    fun updateScreenSize(size: IntSize) {
-        _state.update {
-            it.copy(
-                screenSize = size
-            )
-        }
-    }
-
-    fun updateContainerSize(size: IntSize) {
-        _state.update {
-            it.copy(
-                mediaSize = size
-            )
-        }
-    }
-
-    fun saveMedia(mediaUri: Uri, context: Context) {
-        viewModelScope.launch {
-            try {
-                val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
-                val isVideo = context.contentResolver.getType(mediaUri)?.contains("video") == true
-                val fileName = generateFileName(isVideo)
-                val outputPath = storageStrategy.getFilePath(fileName)
-
-                if (isVideo) {
-                    videoExporter
-                        .exportVideo(
-                            inputUri = mediaUri,
-                            overlayTexts = state.value.overlayTexts,
-                            overlayStickers = state.value.overlayStickers,
-                            outputPath = outputPath
-                        )
-                        .onSuccess { path ->
-                            uploadFile(filePath = path, fileName = fileName)
-                            //shareSheet.shareFile(path)
-                        }
-                        .onFailure { exception ->
-                            Log.e("Export", "Video export failed", exception)
-                        }
-                } else {
-                    mediaExporter
-                        .exportMedia(
-                            backgroundMediaBytes = backgroundMediaBytes,
-                            overlayTexts = state.value.overlayTexts,
-                            overlayStickers = state.value.overlayStickers,
-                            templateSize = state.value.mediaSize,
-                            screenSize = state.value.screenSize,
-                            saveToStorageStrategy = storageStrategy,
-                            fileName = fileName
-                        )
-                        .onSuccess {
-                            uploadFile(filePath = it, fileName = fileName)
-                            //shareSheet.shareFile(it)
-                        }
-                        .onFailure {
-                            it.printStackTrace()
-                        }
-
-                }
-            } catch (e: Exception) {
-                Log.e("Uri loading Error", "Failed to load image: ${e.message}")
-            }
-
-        }
-    }
-
-    private fun generateFileName(isVideo: Boolean): String {
-        return if (isVideo) {
-            "media_${System.currentTimeMillis()}.mp4"
-        } else {
-            "media_${System.currentTimeMillis()}.jpg"
-        }
-    }
-
-    private suspend fun getBytesFromUri(uri: Uri, context: Context): ByteArray =
-        withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
-            } ?: byteArrayOf()
-        }
 }
 
 enum class PostFilterTab {
@@ -670,57 +380,13 @@ enum class PostFilterTab {
 }
 
 data class HomeScreenState @OptIn(ExperimentalUuidApi::class) constructor(
-    val userId: Int = 3,
+    val userId: String = "f1961098-22e1-4fd0-a0f1-7e61c21d120f",
     val isConnected: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
-    val postsList: Map<Int, List<Post>> = emptyMap(),
-    val messagesList: Map<Int, List<Message>> = emptyMap(),
+    val postsList: Map<String, List<Post>> = emptyMap(),
+    val messagesList: Map<String, List<Message>> = emptyMap(),
     val selectedTab: PostFilterTab = PostFilterTab.ALL,
-    val followedUserIds: Set<Int> = emptySet(),
-    val contactUserIds: Set<Int> = emptySet(),
-    val screenSize: IntSize = IntSize.Zero,
-    val mediaSize: IntSize = IntSize.Zero,
-    val isLeavingWithoutSaving: Boolean = false,
-    val overlayTexts: List<TextOverlay> = listOf(
-        TextOverlay(
-            id = "1",
-            text = "Guh",
-            offsetRatioX = 0.5f,
-            offsetRatioY = 0.5f,
-            config = OverlayTextConfig(
-                textStyle = TextStyle(
-                    fontSize = 24.sp,
-                    fontFamily = NunitoFontFamily,
-                    textAlign = TextAlign.Center,
-                    color = Color.Black
-                ),
-                fieldStyle = FieldStyle.Filled,
-                containerColor = Color(0xFF0056FE)
-            )
-        )
-    ),
-    val overlayStickers: List<OverlaySticker> = emptyList(),
-    val selectedTextOverlay: TextOverlay = TextOverlay(
-        id = Uuid.random().toString(),
-        text = "",
-        offsetRatioX = 0.45f,
-        offsetRatioY = 0.48f,
-        config = OverlayTextConfig(
-            textStyle = TextStyle(
-                fontSize = 24.sp,
-                fontFamily = NunitoFontFamily,
-                textAlign = TextAlign.Center,
-                color = Color.Black
-            ),
-            fieldStyle = FieldStyle.Filled,
-            containerColor = Color.White
-        )
-    ),
-    val overlayInteraction: OverlayInteraction = OverlayInteraction.None,
-    val hasLeftEditor: Boolean = false,
-    val isUploading: Boolean = false,
-    val isUploadComplete: Boolean = false,
-    val progress: Float = 0f,
-    val errorMessage: String? = null
+    val followedUserIds: Set<String> = emptySet(),
+    val contactUserIds: Set<String> = emptySet()
 )

@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.dagger.hilt.android)
     id("com.google.devtools.ksp")
-    kotlin("kapt")
 }
 
 android {
@@ -20,6 +19,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains:annotations:23.0.0")
+        }
+
+        exclude(group = "com.intellij", module = "annotations")
     }
 
     ksp {
@@ -47,6 +54,11 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/gradle/incremental.annotation.processors"
+        }
+    }
 }
 
 dependencies {
@@ -64,27 +76,15 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation (libs.kotlinx.coroutines.android)
-    implementation(libs.dagger.compiler)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
+    implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)
-    ksp(libs.dagger.compiler)
     implementation (libs.hilt.android)
     ksp (libs.hilt.compiler)
     implementation (libs.androidx.hilt.navigation.compose)
-    implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.client.logging)
+    implementation(libs.bundles.ktor)
     implementation(libs.kotlinx.datetime)
-    implementation(libs.coil.compose)
-    implementation(libs.coil.video)
-    implementation(libs.coil.network.ktor3)
-    implementation(libs.androidx.media3.transformer)
-    implementation(libs.androidx.media3.effect)
-    implementation(libs.androidx.media3.common)
+    implementation(libs.bundles.coil)
+    implementation(libs.bundles.media3)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

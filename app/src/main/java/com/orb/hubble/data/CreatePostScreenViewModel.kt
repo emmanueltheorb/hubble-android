@@ -3,6 +3,8 @@
 package com.orb.hubble.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
@@ -30,6 +32,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
@@ -44,6 +48,7 @@ import okio.FileNotFoundException
 import javax.inject.Inject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import androidx.core.graphics.scale
 
 @HiltViewModel
 class CreatePostScreenViewModel @Inject constructor(
@@ -70,6 +75,12 @@ class CreatePostScreenViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000L),
             initialValue = CreatePostScreenState()
         )
+
+    private val _thumbnails = MutableStateFlow<List<Bitmap>>(emptyList())
+    val thumbnails: StateFlow<List<Bitmap>> = _thumbnails.asStateFlow()
+
+    private val _isLoadingThumbnails = MutableStateFlow(false)
+    val isLoadingThumbnails = _isLoadingThumbnails.asStateFlow()
 
     fun uploadFile(filePath: String, fileName: String) {
         uploadJob = postRepository
@@ -139,6 +150,8 @@ class CreatePostScreenViewModel @Inject constructor(
         id: String,
         offset: Offset,
         rotation: Float,
+        positionX: Float,
+        positionY: Float,
         scale: Float
     ) {
         _state.update {
@@ -149,6 +162,8 @@ class CreatePostScreenViewModel @Inject constructor(
                         overlayText.copy(
                             offsetRatioX = offset.x / width,
                             offsetRatioY = offset.y / height,
+                            positionX = positionX,
+                            positionY = positionY,
                             rotation = rotation,
                             scale = scale
                         )
@@ -161,29 +176,66 @@ class CreatePostScreenViewModel @Inject constructor(
     fun transformOverlaySticker(
         id: String,
         offset: Offset,
+        renderOffset: Offset,
         rotation: Float,
         scale: Float,
         parentSize: Size,
-        currentStickerBaseSize: Size
+        normalizedWidth: Float
     ) {
         _state.update {
             val (width, height) = parentSize
             it.copy(
                 overlayStickers = it.overlayStickers.map { overlaySticker ->
-                    // Calculate the current visual width relative to the parent width
-                    val relativeWidth = (currentStickerBaseSize.width * scale) / width
 
                     if (overlaySticker.id == id) {
                         overlaySticker.copy(
                             offsetRatioX = offset.x / width,
                             offsetRatioY = offset.y / height,
+                            positionX = renderOffset.x,
+                            positionY = renderOffset.y,
                             rotation = rotation,
                             scale = scale,
-                            normalizedWidth = relativeWidth // Store the essential size data
+                            normalizedWidth = normalizedWidth
                         )
                     } else overlaySticker
                 }
             )
+        }
+    }
+
+    fun generateThumbnails(
+        context: Context,
+        videoUri: Uri,
+        thumbnailCount: Int = 9
+    ) {
+        if (_isLoadingThumbnails.value) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _isLoadingThumbnails.value = true
+            _thumbnails.value = emptyList()
+
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(context, videoUri)
+                val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
+                val interval = durationMs / thumbnailCount
+
+                for (i in 0 until thumbnailCount) {
+                    val timeUs = i * interval * 1000
+                    val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    bitmap?.let {
+                        val scaled = it.scale(150, 150, false)
+                        _thumbnails.update { currentList ->
+                            currentList + scaled
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                retriever.release()
+                _isLoadingThumbnails.value = false
+            }
         }
     }
 
@@ -342,10 +394,9 @@ class CreatePostScreenViewModel @Inject constructor(
         }
     }
 
-    fun saveMedia(mediaUri: Uri, context: Context) {
+    fun saveMedia(mediaUri: Uri, context: Context, startMs: Long, endMs: Long) {
         viewModelScope.launch {
             try {
-                val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
                 val isVideo = context.contentResolver.getType(mediaUri)?.contains("video") == true
                 val fileName = generateFileName(isVideo)
                 val outputPath = storageStrategy.getFilePath(fileName)
@@ -354,18 +405,22 @@ class CreatePostScreenViewModel @Inject constructor(
                     videoExporter
                         .exportVideo(
                             inputUri = mediaUri,
+                            startMs = startMs,
+                            endMs = endMs,
                             overlayTexts = state.value.overlayTexts,
                             overlayStickers = state.value.overlayStickers,
                             outputPath = outputPath
                         )
                         .onSuccess { path ->
-                            uploadFile(filePath = path, fileName = fileName)
-                            //shareSheet.shareFile(path)
+                            //uploadFile(filePath = path, fileName = fileName)
+                            shareSheet.shareFile(path)
                         }
                         .onFailure { exception ->
                             Log.e("Export", "Video export failed", exception)
                         }
                 } else {
+                    val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
+
                     mediaExporter
                         .exportMedia(
                             backgroundMediaBytes = backgroundMediaBytes,
@@ -377,8 +432,8 @@ class CreatePostScreenViewModel @Inject constructor(
                             fileName = fileName
                         )
                         .onSuccess {
-                            uploadFile(filePath = it, fileName = fileName)
-                            //shareSheet.shareFile(it)
+                            //uploadFile(filePath = it, fileName = fileName)
+                            shareSheet.shareFile(it)
                         }
                         .onFailure {
                             it.printStackTrace()

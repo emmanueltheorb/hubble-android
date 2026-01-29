@@ -46,7 +46,7 @@ fun NavGraphBuilder.homeGraph(
             val viewModel: HomeScreenViewModel = hiltViewModel(parentEntry)
 
             HomeScreen(
-                userId = 3,
+                userId = "3",
                 viewModel = viewModel,
                 navToViewStatusScreen = { userId ->
                     navController.navigate(Dest.ViewStatusScreen(userId = userId))
@@ -77,21 +77,15 @@ fun NavGraphBuilder.homeGraph(
                     navController.navigate(Dest.CreatePostScreen(mediaUri = uriString))
                 },
                 onNavigate = {
-
+                    navController.navigateUp()
                 }
             )
         }
 
         composable<Dest.CreatePostScreen> {
-            val parentEntry = remember(it) {
-                navController.getBackStackEntry(SubGraph.Home)
-            }
-            val viewModel: HomeScreenViewModel = hiltViewModel(parentEntry)
-
             val createPostScreen: Dest.CreatePostScreen = it.toRoute<Dest.CreatePostScreen>()
             CreatePostScreen(
-                mediaUri = createPostScreen.mediaUri,
-                viewModel = viewModel
+                mediaUri = createPostScreen.mediaUri
             )
         }
     }
