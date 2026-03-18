@@ -1,4 +1,4 @@
-package com.orb.hubble.data
+package com.orb.hubble.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
@@ -6,15 +6,22 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.orb.hubble.data.CacheEntry
+import com.orb.hubble.data.Message
+import com.orb.hubble.data.Page
+import com.orb.hubble.data.Post
+import com.orb.hubble.data.User
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
-@Database(entities = [Post::class, Message::class], version = 5)
+@Database(entities = [Post::class, Message::class, CacheEntry::class], version = 9)
 @TypeConverters(Converters::class)
 abstract class PostDatabase : RoomDatabase() {
 
     abstract val postDao: PostDao
     abstract val messageDao: MessageDao
+
+    abstract val cacheEntryDao: CacheEntryDao
 
     companion object {
         val migration1to2 = object : Migration(1, 2) {
@@ -100,11 +107,34 @@ abstract class PostDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_post_userId` ON `post` (`userId`)")
             }
         }
+
+        val migration7to8 = object: Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `media_cache_entries` (
+                    `url` TEXT NOT NULL,
+                    `insertedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`url`)
+                    )
+                """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_cache_entries`" +
+                            "ON `media_cache_entries` (`insertedAt`)"
+                )
+            }
+        }
     }
 }
 
 class Converters {
     private val json = Json { ignoreUnknownKeys = true }
+
+    @TypeConverter
+    fun fromPage(page: Page): String = json.encodeToString(page)
+
+    @TypeConverter
+    fun toPage(jsonString: String): Page = json.decodeFromString(jsonString)
 
     @TypeConverter
     fun fromUser(user: User): String = json.encodeToString(user)

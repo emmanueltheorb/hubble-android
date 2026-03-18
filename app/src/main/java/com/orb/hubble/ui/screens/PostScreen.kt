@@ -3,6 +3,7 @@ package com.orb.hubble.ui.screens
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -35,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,14 +53,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.size.Precision
 import coil3.video.VideoFrameDecoder
 import coil3.video.videoFrameMillis
 import com.orb.hubble.R
+import com.orb.hubble.data.PostScreenViewModel
 import com.orb.hubble.ui.theme.Black1
+import com.orb.hubble.ui.theme.Black3
 import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
@@ -68,6 +78,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PostScreen(
     modifier: Modifier = Modifier,
+    viewModel: PostScreenViewModel = hiltViewModel(),
     postType: String = "Media",
     onMediaSelected: (String) -> Unit,
     onNavigate: () -> Unit
@@ -75,6 +86,8 @@ fun PostScreen(
     val context = LocalActivity.current
     var hasPermissions by remember { mutableStateOf(false) }
     var goBack by remember { mutableStateOf(false) }
+
+    val pagingItems = viewModel.mediaPager.collectAsLazyPagingItems()
 
     val bottomPadding =
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
@@ -126,7 +139,8 @@ fun PostScreen(
                 MediaGrid(
                     onMediaSelected = { uri ->
                         onMediaSelected(uri.toString())
-                    }
+                    },
+                    pagingItems = pagingItems
                 )
                 MoreFolder {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -154,148 +168,26 @@ fun PostScreen(
 
 @Composable
 fun MediaGrid(
-    onMediaSelected: (Uri) -> Unit
+    onMediaSelected: (Uri) -> Unit,
+    pagingItems: LazyPagingItems<MediaItem>
 ) {
-    val context = LocalContext.current
-    val mediaItems = remember { mutableStateListOf<MediaItem>() }
-
-    LaunchedEffect(Unit) {
-        mediaItems.addAll(loadMediaFromFolders(context))
-    }
-
     LazyVerticalGrid(
         modifier = Modifier.background(color = Black1),
         columns = GridCells.Adaptive(minSize = 128.dp)
     ) {
-        items(mediaItems) { item ->
-            MediaThumbnail(
-                mediaItem = item,
-                onMediaSelected = onMediaSelected
-            )
-        }
-    }
-}
-
-private suspend fun loadMediaFromFolders(context: Context): List<MediaItem> =
-    withContext(Dispatchers.IO) {
-        val mediaItems = mutableListOf<MediaItem>()
-
-        // Query for images
-        loadImages(context, mediaItems)
-        // Query for videos
-        loadVideos(context, mediaItems)
-
-        // Sort all items by date added (newest first)
-        return@withContext mediaItems.sortedByDescending { it.dateAdded }
-    }
-
-private fun loadImages(context: Context, mediaItems: MutableList<MediaItem>) {
-    val imageProjection = arrayOf(
-        MediaStore.Images.Media._ID,
-        MediaStore.Images.Media.DISPLAY_NAME,
-        MediaStore.Images.Media.DATE_ADDED,
-        MediaStore.Images.Media.MIME_TYPE,
-        MediaStore.Images.Media.RELATIVE_PATH,
-        MediaStore.Images.Media.BUCKET_DISPLAY_NAME
-    )
-
-    val imageUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-    val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-
-    context.contentResolver.query(
-        imageUri,
-        imageProjection,
-        null,
-        null,
-        imageSortOrder
-    )?.use { cursor ->
-        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-        val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-        val mimeTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
-        val relativePathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
-        val bucketColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-
-        while (cursor.moveToNext()) {
-            val id = cursor.getLong(idColumn)
-            val name = cursor.getString(nameColumn)
-            val dateAdded = cursor.getLong(dateColumn)
-            val mimeType = cursor.getString(mimeTypeColumn)
-            val relativePath = cursor.getString(relativePathColumn)
-            val bucketName = cursor.getString(bucketColumn)
-            val contentUri = ContentUris.withAppendedId(imageUri, id)
-
-            val folder = determineFolder(relativePath, bucketName, mimeType, isVideo = false)
-
-            if (folder in listOf("Camera", "DCIM", "Pictures", "Downloads", "WhatsApp", "Videos")) {
-                mediaItems.add(
-                    MediaItem(
-                        id = id,
-                        name = name,
-                        uri = contentUri,
-                        mimeType = mimeType,
-                        dateAdded = dateAdded,
-                        folder = folder
-                    )
+        items(
+            count = pagingItems.itemCount,
+            key = pagingItems.itemKey { it.id },
+            contentType = pagingItems.itemContentType { "media" }
+        ) { index ->
+            val item = pagingItems[index]
+            if (item != null) {
+                MediaThumbnail(
+                    mediaItem = item,
+                    onMediaSelected = onMediaSelected
                 )
-            }
-        }
-    }
-}
-
-private fun loadVideos(context: Context, mediaItems: MutableList<MediaItem>) {
-    val videoProjection = arrayOf(
-        MediaStore.Video.Media._ID,
-        MediaStore.Video.Media.DISPLAY_NAME,
-        MediaStore.Video.Media.DATE_ADDED,
-        MediaStore.Video.Media.MIME_TYPE,
-        MediaStore.Video.Media.RELATIVE_PATH,
-        MediaStore.Video.Media.BUCKET_DISPLAY_NAME,
-        MediaStore.Video.Media.DURATION
-    )
-
-    val videoUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-    val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
-
-    context.contentResolver.query(
-        videoUri,
-        videoProjection,
-        null,
-        null,
-        videoSortOrder
-    )?.use { cursor ->
-        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-        val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
-        val mimeTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
-        val relativePathColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.RELATIVE_PATH)
-        val bucketColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
-        val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-
-        while (cursor.moveToNext()) {
-            val id = cursor.getLong(idColumn)
-            val name = cursor.getString(nameColumn)
-            val dateAdded = cursor.getLong(dateColumn)
-            val mimeType = cursor.getString(mimeTypeColumn)
-            val relativePath = cursor.getString(relativePathColumn)
-            val bucketName = cursor.getString(bucketColumn)
-            val duration = cursor.getLong(durationColumn)
-            val contentUri = ContentUris.withAppendedId(videoUri, id)
-
-            val folder = determineFolder(relativePath, bucketName, mimeType, isVideo = true)
-
-            if (folder in listOf("Camera", "DCIM", "Pictures", "Downloads", "WhatsApp", "Videos")) {
-                mediaItems.add(
-                    MediaItem(
-                        id = id,
-                        name = name,
-                        uri = contentUri,
-                        mimeType = mimeType,
-                        dateAdded = dateAdded,
-                        duration = duration,
-                        folder = folder
-                    )
-                )
+            } else {
+                Box(Modifier.size(128.dp).background(Color.Transparent))
             }
         }
     }
@@ -313,33 +205,31 @@ fun MediaThumbnail(
             .size(128.dp)
             .padding(1.dp)
     ) {
-        val imageRequest = remember(mediaItem.uri) {
-            ImageRequest.Builder(context)
-                .data(mediaItem.uri)
-                .apply {
-                    if (mediaItem.mimeType.startsWith("video/")) {
-                        videoFrameMillis(1000)
-                    }
-                }
-                .crossfade(true)
-                .build()
+        val model = remember(mediaItem.uri) {
+            mediaItem.thumbnail
+                ?: ImageRequest.Builder(context)
+                    .data(mediaItem.uri)
+                    .precision(Precision.INEXACT)
+                    .size(250, 250)
+                    .crossfade(true)
+                    .build()
         }
 
-        AsyncImage(
-            model = imageRequest,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable {
-                    onMediaSelected(mediaItem.uri)
-                },
-            contentScale = ContentScale.Crop,
-            imageLoader = ImageLoader.Builder(context)
-                .components {
-                    add(VideoFrameDecoder.Factory())
-                }
-                .build()
-        )
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.fillMaxSize().background(Black3))
+            AsyncImage(
+                model = model,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable {
+                        onMediaSelected(mediaItem.uri)
+                    },
+                contentScale = ContentScale.Crop
+            )
+        }
 
         if (mediaItem.mimeType.startsWith("video/")) {
             Box(
@@ -371,35 +261,6 @@ fun MediaThumbnail(
     }
 }
 
-private fun determineFolder(
-    relativePath: String?,
-    bucketName: String?,
-    mimeType: String?,
-    isVideo: Boolean
-): String {
-    // Check bucket name first (more reliable)
-    when {
-        bucketName?.equals("Camera", ignoreCase = true) == true -> return "Camera"
-        bucketName?.equals("Pictures", ignoreCase = true) == true -> return "Pictures"
-        bucketName?.equals("Download", ignoreCase = true) == true -> return "Downloads"
-        bucketName?.equals("Downloads", ignoreCase = true) == true -> return "Downloads"
-        bucketName?.equals("WhatsApp", ignoreCase = true) == true -> return "WhatsApp"
-        bucketName?.equals("WhatsApp Images", ignoreCase = true) == true -> return "WhatsApp"
-        bucketName?.equals("WhatsApp Video", ignoreCase = true) == true -> return "WhatsApp"
-    }
-
-    // Check relative path as fallback
-    when {
-        relativePath?.contains("DCIM/") == true -> return "DCIM"
-        relativePath?.contains("Pictures") == true -> return "Pictures"
-        relativePath?.contains("Download") == true -> return "Downloads"
-        relativePath?.contains("WhatsApp") == true -> return "WhatsApp"
-        relativePath?.contains("video/") == true -> return "Videos"
-    }
-
-    return "others"
-}
-
 private fun formatDuration(durationMs: Long): String {
     val seconds = (durationMs / 1000) % 60
     val minutes = (durationMs / (1000 * 60)) % 60
@@ -423,6 +284,7 @@ private fun formatDuration(durationMs: Long): String {
     }
 }
 
+@Stable
 data class MediaItem(
     val id: Long,
     val name: String,
@@ -430,7 +292,8 @@ data class MediaItem(
     val mimeType: String,
     val dateAdded: Long,
     val duration: Long = 0,
-    val folder: String = ""
+    val folder: String = "",
+    val thumbnail: Bitmap? = null
 )
 
 @Composable

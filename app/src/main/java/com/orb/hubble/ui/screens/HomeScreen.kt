@@ -1,5 +1,6 @@
 package com.orb.hubble.ui.screens
 
+import androidx.annotation.OptIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,12 +45,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.util.UnstableApi
 import com.orb.hubble.R
 import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.PostFilterTab
+import com.orb.hubble.data.PostsState
 import com.orb.hubble.data.User
-import com.orb.hubble.data.mockPosts
 //import com.orb.hubble.data.postsList10
 //import com.orb.hubble.data.postsList4
 import com.orb.hubble.ui.components.StatusItem
@@ -63,17 +65,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@OptIn(UnstableApi::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     userId: String = "3",
     viewModel: HomeScreenViewModel = hiltViewModel(),
     navToViewStatusScreen: (String) -> Unit,
-    navToAddPostScreen: () -> Unit
+    navToAddPostScreen: () -> Unit,
+    navToReplyLogScreenTemporary: () -> Unit
 ) {
     val uiState by viewModel.state.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val filteredPosts by viewModel.filteredPosts.collectAsStateWithLifecycle()
+    val postsState by viewModel.postsState.collectAsState()
+    val myStatus by viewModel.myPosts.collectAsState()
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(
         initialPage = selectedTab.ordinal,
@@ -122,13 +128,28 @@ fun HomeScreen(
                 )
             }
             item {
-                MyStatus(
-                    user = mockPosts.entries.toList().first().value.first().user,
-                    onAddPostClicked = {},
-                    onViewStatusClicked = { userId ->
-                        navToViewStatusScreen(userId)
-                    },
-                )
+                if (myStatus.isEmpty()) {
+                    MyStatus(
+                        user = User(
+                            id = "",
+                            username = "Teo",
+                            color = "",
+                            phoneNumber = "09012345678"
+                        ),
+                        onAddPostClicked = {},
+                        onViewStatusClicked = { pageId ->
+                            navToViewStatusScreen(pageId)
+                        },
+                    )
+                } else {
+                    StatusItem(
+                        posts = myStatus,
+                        username = myStatus.first().page.name,
+                        onStatusClicked = { pageId ->
+                            navToViewStatusScreen(pageId)
+                        }
+                    )
+                }
             }
             item {
                 Row(
@@ -161,15 +182,17 @@ fun HomeScreen(
                 Posts(
                     state = pagerState,
                     filteredPosts = filteredPosts,
-                    navToViewStatusScreen = { userId ->
-                        navToViewStatusScreen(userId)
+                    postsState = postsState,
+                    navToViewStatusScreen = { pageId ->
+                        navToViewStatusScreen(pageId)
                     }
                 )
             }
         }
         TopBar(
             topPadding = topPadding,
-            onSearchClicked = navToAddPostScreen
+            onSearchClicked = navToAddPostScreen,
+            onThreeDotClicked = navToReplyLogScreenTemporary
         )
     }
 }
@@ -240,8 +263,8 @@ fun MyStatus(
         StatusItem(
             posts = posts,
             username = "My Status",
-            onStatusClicked = { userId ->
-                onViewStatusClicked(userId)
+            onStatusClicked = { pageId ->
+                onViewStatusClicked(pageId)
             }
         )
     }
@@ -251,7 +274,8 @@ fun MyStatus(
 private fun TopBar(
     modifier: Modifier = Modifier,
     topPadding: Int,
-    onSearchClicked: () -> Unit
+    onSearchClicked: () -> Unit,
+    onThreeDotClicked: () -> Unit
 ) {
     Row(
         modifier = modifier
@@ -280,7 +304,7 @@ private fun TopBar(
         }
         Spacer(Modifier.width(1.dp))
         IconButton(
-            onClick = {},
+            onClick = onThreeDotClicked,
             shape = RectangleShape,
             modifier = Modifier.wrapContentSize()
         ) {
@@ -316,6 +340,7 @@ fun Posts(
     modifier: Modifier = Modifier,
     state: PagerState,
     filteredPosts: Map<String, List<Post>>,
+    postsState: PostsState,
     navToViewStatusScreen: (String) -> Unit
 ) {
     HorizontalPager(
@@ -325,20 +350,71 @@ fun Posts(
         beyondViewportPageCount = 0,
         state = state
     ) { page ->
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(900.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
-        ) {
-            filteredPosts.entries.forEach { (_, postList) ->
-                StatusItem(
-                    posts = postList,
-                    username = postList[0].user.username,
-                    onStatusClicked = { userId ->
-                        navToViewStatusScreen(userId)
+        when (page) {
+            0 -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(900.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp)
+                ) {
+//                    filteredPosts.entries.forEach { (_, postList) ->
+//                        StatusItem(
+//                            posts = postList,
+//                            username = postList[0].page.name,
+//                            onStatusClicked = { pageId ->
+//                                navToViewStatusScreen(pageId)
+//                            }
+//                        )
+//                    }
+                    postsState.allTabRecentPosts.forEach {
+                        StatusItem(
+                            posts = it.posts,
+                            username = it.username,
+                            onStatusClicked = { pageId ->
+                                navToViewStatusScreen(pageId)
+                            }
+                        )
                     }
-                )
+                }
+            }
+
+            1 -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(900.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp)
+                ) {
+                    postsState.followingTabRecentPosts.forEach {
+                        StatusItem(
+                            posts = it.posts,
+                            username = it.username,
+                            onStatusClicked = { pageId ->
+                                navToViewStatusScreen(pageId)
+                            }
+                        )
+                    }
+                }
+            }
+
+            2 -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(900.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp)
+                ) {
+                    postsState.contactsTabRecentPosts.forEach {
+                        StatusItem(
+                            posts = it.posts,
+                            username = it.username,
+                            onStatusClicked = { pageId ->
+                                navToViewStatusScreen(pageId)
+                            }
+                        )
+                    }
+                }
             }
         }
     }

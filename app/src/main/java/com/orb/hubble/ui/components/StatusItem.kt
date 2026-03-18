@@ -41,6 +41,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.error
 import com.orb.hubble.R
+import com.orb.hubble.data.Page
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.User
 import com.orb.hubble.ui.theme.Blue2
@@ -72,7 +73,7 @@ fun StatusItem(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = { onStatusClicked(posts[0].userId) }
+                onClick = { onStatusClicked(posts[0].pageId) }
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -94,13 +95,13 @@ fun StatusItem(
                 Time(insertedAt = posts.last().insertedAt)
             }
             Text(
-                text = posts.last().user.username,
+                text = posts.last().page.name,
                 style = Typography.labelSmall.copy(fontSize = 11.sp),
                 color = White2
             )
         }
         Spacer(modifier.weight(1f))
-        ProfilePic(user = posts[0].user)
+        ProfilePic(page = posts[0].page)
     }
 }
 
@@ -124,7 +125,7 @@ fun StatusView(
             strokeWidth = strokeWidth,
             activeColor = activeColor,
             inactiveColor = inactiveColor,
-            modifier = Modifier.size(innerCircleSize + strokeWidth * 3)
+            modifier = Modifier.size(innerCircleSize + strokeWidth * 4)
         )
 
         // Inner circle (where the user's latest status/image would be displayed)
@@ -217,7 +218,7 @@ fun SegmentedCircularProgress(
 @Composable
 fun ProfilePic(
     modifier: Modifier = Modifier,
-    user: User
+    page: Page
 ) {
     Surface(
         modifier = modifier.size(45.dp),

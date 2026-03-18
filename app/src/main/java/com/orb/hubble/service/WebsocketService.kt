@@ -94,11 +94,11 @@ class WebsocketService @Inject constructor() {
         try {
             val jsonString = when (event) {
                 is ClientEvent.CreatePost -> event.toJson(json)
-                is ClientEvent.FollowUser -> event.toJson(json)
+                is ClientEvent.FollowPage -> event.toJson(json)
                 is ClientEvent.JoinPost -> event.toJson(json)
                 is ClientEvent.PostMessage -> event.toJson(json)
                 is ClientEvent.SyncContact -> event.toJson(json)
-                is ClientEvent.GetFollowedUsers -> event.toJson(json)
+                is ClientEvent.GetFollowedPages -> event.toJson(json)
                 is ClientEvent.GetContacts -> event.toJson(json)
             }
 
@@ -134,9 +134,9 @@ class WebsocketService @Inject constructor() {
                 }
                 "followed_ids" -> {
                     val list = json.decodeFromJsonElement<List<String>>(
-                        jsonObject["followedUsers"] ?: return
+                        jsonObject["followedPages"] ?: return
                     )
-                    _events.emit(WebsocketEvent.FollowedUsers(followedUsers = list))
+                    _events.emit(WebsocketEvent.FollowedPages(followedPages = list))
                 }
                 "contact_ids" -> {
                     val list = json.decodeFromJsonElement<List<String>>(

@@ -22,10 +22,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface UserRepository {
-    val followedUsers: StateFlow<List<String>>
+    val followedPages: StateFlow<List<String>>
     val contacts: StateFlow<List<String>>
 
-    suspend fun getFollowedUsers(userId: String)
+    suspend fun getFollowedPages(pageId: String)
     suspend fun getContacts(userId: String)
 }
 
@@ -34,8 +34,8 @@ class UserRepositoryImpl @Inject constructor(
     private val websocketService: WebsocketService // Your API service
 ) : UserRepository {
 
-    private val _followedUsers = MutableStateFlow<List<String>>(emptyList())
-    override val followedUsers: StateFlow<List<String>> = _followedUsers.asStateFlow()
+    private val _followedPages = MutableStateFlow<List<String>>(emptyList())
+    override val followedPages: StateFlow<List<String>> = _followedPages.asStateFlow()
 
     private val _contacts = MutableStateFlow<List<String>>(emptyList())
     override val contacts: StateFlow<List<String>> = _contacts.asStateFlow()
@@ -50,13 +50,13 @@ class UserRepositoryImpl @Inject constructor(
             websocketService.events
                 .map { event ->
                     when (event) {
-                        is WebsocketEvent.FollowedUsers -> event.followedUsers
+                        is WebsocketEvent.FollowedPages -> event.followedPages
                         else -> null
                     }
                 }
                 .filterNotNull()
-                .collect { followedUsers ->
-                    _followedUsers.value = followedUsers
+                .collect { followedPages ->
+                    _followedPages.value = followedPages
                 }
         }
 
@@ -76,8 +76,8 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFollowedUsers(userId: String) {
-        websocketService.sendEvent(ClientEvent.GetFollowedUsers(userId))
+    override suspend fun getFollowedPages(pageId: String) {
+        websocketService.sendEvent(ClientEvent.GetFollowedPages(pageId))
     }
 
     override suspend fun getContacts(userId: String) {

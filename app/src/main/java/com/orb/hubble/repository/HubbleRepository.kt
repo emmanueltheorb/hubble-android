@@ -1,26 +1,30 @@
 package com.orb.hubble.repository
 
+import com.orb.hubble.data.CacheEntry
+import com.orb.hubble.data.local.CacheEntryDao
 import com.orb.hubble.data.ClientEvent
 import com.orb.hubble.data.Contact
 import com.orb.hubble.data.CreatePostRequest
 import com.orb.hubble.data.FollowRequest
 import com.orb.hubble.data.Message
-import com.orb.hubble.data.MessageDao
-import com.orb.hubble.data.MessageWithReply
+import com.orb.hubble.data.MessageWithPostAndReply
+import com.orb.hubble.data.local.MessageDao
 import com.orb.hubble.data.Post
-import com.orb.hubble.data.PostDao
+import com.orb.hubble.data.local.PostDao
 import com.orb.hubble.data.PostMessageRequest
 import com.orb.hubble.data.WebsocketEvent
 import com.orb.hubble.di.ApplicationScope
 import com.orb.hubble.service.WebsocketService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -28,6 +32,7 @@ import kotlin.time.Instant
 class HubbleRepository @Inject constructor(
     private val websocketService: WebsocketService,
     private val postDao: PostDao,
+    private val cacheEntryDao: CacheEntryDao,
     private val messagesDao: MessageDao,
     @param:ApplicationScope private val externalScope: CoroutineScope
 ) {
@@ -43,8 +48,28 @@ class HubbleRepository @Inject constructor(
         websocketService.events
             .onEach { event ->
                 when (event) {
-                    is WebsocketEvent.NewPost -> postDao.upsertPost(event.post)
-                    is WebsocketEvent.MissedPost -> postDao.upsertPost(event.post)
+                    is WebsocketEvent.NewPost -> {
+                        postDao.upsertPost(event.post)
+                        if (event.post.type.equals("video", ignoreCase = true)) {
+                            cacheEntryDao.upsert(
+                                CacheEntry(
+                                    url = event.post.contentUrl ?: "",
+                                    insertedAt = Clock.System.now().toEpochMilliseconds()
+                                )
+                            )
+                        }
+                    }
+                    is WebsocketEvent.MissedPost -> {
+                        postDao.upsertPost(event.post)
+                        if (event.post.type.equals("video", ignoreCase = true)) {
+                            cacheEntryDao.upsert(
+                                CacheEntry(
+                                    url = event.post.contentUrl ?: "",
+                                    insertedAt = Clock.System.now().toEpochMilliseconds()
+                                )
+                            )
+                        }
+                    }
                     // You can add message persistence here later
                     else -> Unit
                 }
@@ -63,9 +88,9 @@ class HubbleRepository @Inject constructor(
             .launchIn(externalScope)
     }
 
-    fun getAllPosts(): Flow<List<Post>> = postDao.getPostsOrderedByTimestamp()
+    fun getAllPosts(): Flow<List<Post>> = postDao.getPostsOrderedByPageIdAndTimestamp()
 
-    fun getUserPosts(userId: String): Flow<List<Post>> = postDao.getUserPosts(userId)
+    fun getPagePosts(pageId: String): Flow<List<Post>> = postDao.getPagePosts(pageId)
 
     fun getAllMessages(postId: String): Flow<List<Message>> = messagesDao.getMessagesForPost(postId)
         .map { messagesWithReplies ->
@@ -73,6 +98,20 @@ class HubbleRepository @Inject constructor(
                 item.message.copy(repliedMessage = item.repliedMessage)
             }
         }
+        .flowOn(Dispatchers.Default)
+
+    fun getReplies(userId: String): Flow<List<Message>> = messagesDao.getReplies(userId)
+        .map { messageWithReplies ->
+            messageWithReplies.map { item ->
+                item.message.copy(repliedMessage = item.repliedMessage)
+            }
+        }
+        .flowOn(Dispatchers.Default)
+
+    fun getReplyLogs(userId: String): Flow<List<MessageWithPostAndReply>> = messagesDao.getReplyLogs(userId)
+        .flowOn(Dispatchers.IO)
+
+    fun getPost(postId: String): Flow<List<Post>> = postDao.getPost(postId)
 
 //    val newPosts: Flow<Post> = websocketService.events
 //        .map { event ->
@@ -114,16 +153,16 @@ class HubbleRepository @Inject constructor(
         websocketService.sendEvent(ClientEvent.JoinPost(postId, from))
     }
 
-    suspend fun createPost(post: CreatePostRequest) {
-        websocketService.sendEvent(ClientEvent.CreatePost(post))
+    suspend fun createPost(post: CreatePostRequest, pageId: String) {
+        websocketService.sendEvent(ClientEvent.CreatePost(post, pageId))
     }
 
     suspend fun sendMessage(message: PostMessageRequest) {
         websocketService.sendEvent(ClientEvent.PostMessage(message))
     }
 
-    suspend fun followUser(users: FollowRequest) {
-        websocketService.sendEvent(ClientEvent.FollowUser(users))
+    suspend fun followPage(pages: FollowRequest) {
+        websocketService.sendEvent(ClientEvent.FollowPage(pages))
     }
 
     suspend fun disconnect() {

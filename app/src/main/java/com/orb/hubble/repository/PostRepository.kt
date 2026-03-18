@@ -40,7 +40,8 @@ class PostRepository(
         httpClient.submitFormWithBinaryData(
             url = "https://roma-hexaplaric-trilaterally.ngrok-free.dev/api/upload",
             formData = formData {
-                append("user_id", "f1961098-22e1-4fd0-a0f1-7e61c21d120f")
+                append("user_id", "f0c7cfbc-604b-437e-bcce-2f6e17e063b7")
+                append("page_id", "7043d14d-1922-423c-a24a-3c882693b323")
                 append("description", "Test")
                 append("content_text", "")
                 append("content_url", "")

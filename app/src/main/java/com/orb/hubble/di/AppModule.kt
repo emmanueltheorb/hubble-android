@@ -1,20 +1,29 @@
 package com.orb.hubble.di
 
 import android.content.Context
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.room.Room
+import com.orb.hubble.data.local.CacheEntryDao
 import com.orb.hubble.data.CacheStorageStrategy
-import com.orb.hubble.data.MessageDao
-import com.orb.hubble.data.PostDao
-import com.orb.hubble.data.PostDatabase
+import com.orb.hubble.data.local.MessageDao
+import com.orb.hubble.data.local.PostDao
+import com.orb.hubble.data.local.PostDatabase
 import com.orb.hubble.data.StorageMediaExporter
 import com.orb.hubble.data.VideoMediaExporter
-import com.orb.hubble.repository.HubbleRepository
+import com.orb.hubble.data.local.PostDatabase.Companion.migration7to8
 import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.repository.UserRepository
 import com.orb.hubble.repository.UserRepositoryImpl
 import com.orb.hubble.service.WebsocketService
 import com.orb.hubble.utils.FileReader
-import com.orb.hubble.utils.MediaExporter
+import com.orb.hubble.utils.MediaPagingSource
 import com.orb.hubble.utils.SaveToStorageStrategy
 import com.orb.hubble.utils.StorageShareSheet
 import dagger.Module
@@ -27,6 +36,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
+import java.io.File
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -65,7 +75,6 @@ object AppModule {
     @Provides
     fun providePostDatabase(@ApplicationContext context: Context): PostDatabase =
         Room.databaseBuilder(context, PostDatabase::class.java, "post.db")
-            .addMigrations(PostDatabase.migration4to5)
             .build()
 
     @Provides
@@ -73,6 +82,9 @@ object AppModule {
 
     @Provides
     fun provideMessageDao(database: PostDatabase): MessageDao = database.messageDao
+
+    @Provides
+    fun provideCacheEntryDao(database: PostDatabase): CacheEntryDao = database.cacheEntryDao
 
     @Provides
     @Singleton
@@ -83,6 +95,7 @@ object AppModule {
     @Singleton
     fun provideFileReader(@ApplicationContext context: Context): FileReader =
         FileReader(context = context)
+
 
     @Provides
     @Singleton
@@ -103,6 +116,32 @@ object AppModule {
     @Singleton
     fun provideSaveToStorageStrategy(@ApplicationContext context: Context): SaveToStorageStrategy =
         CacheStorageStrategy(context)
+
+    @OptIn(UnstableApi::class)
+    @Provides
+    @Singleton
+    fun provideSimpleCache(@ApplicationContext context: Context): SimpleCache {
+        val persistentFolder = File(context.filesDir, "media_cache")
+        val evictor = NoOpCacheEvictor()
+        val databaseProvider = StandaloneDatabaseProvider(context)
+
+        return SimpleCache(persistentFolder, evictor, databaseProvider)
+    }
+
+    @OptIn(UnstableApi::class)
+    @Provides
+    @Singleton
+    fun provideCacheDataSourceFactory(
+        cache: SimpleCache,
+        @ApplicationContext context: Context
+    ): DataSource.Factory {
+        val upstreamFactory = DefaultHttpDataSource.Factory()
+
+        return CacheDataSource.Factory()
+            .setCache(cache)
+            .setUpstreamDataSourceFactory(upstreamFactory)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
 
     @Provides
     @Singleton

@@ -1,10 +1,14 @@
 package com.orb.hubble.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -12,9 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -22,8 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -32,26 +34,23 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -63,9 +62,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.orb.hubble.data.Message
-import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black2
-import com.orb.hubble.ui.theme.Grey1
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.roundToInt
@@ -77,24 +74,46 @@ import com.orb.hubble.ui.theme.NunitoFontFamily
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
+import com.orb.hubble.ui.theme.WhiteHighlight
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @Composable
 fun MessagesSection(
     modifier: Modifier = Modifier,
     messages: List<Message>,
+    messageId: String? = null,
     bottomPadding: Dp = 55.dp,
     onMessageDragged: (Message) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    var highlightedMessageId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(messages) {
+        if (messageId != null && messages.isNotEmpty()) {
+            val index = messages.indexOfFirst { it.id == messageId }
+
+            if (index != -1) {
+                listState.animateScrollToItem(index = index)
+                highlightedMessageId = messageId
+                delay(3000)
+                highlightedMessageId = null
+            }
+        }
+    }
+
     LazyColumn(
         modifier = modifier
-            .padding(bottom = bottomPadding)
+            .padding(bottom = bottomPadding),
+        state = listState
     ) {
         itemsIndexed(messages) { index, message ->
             val topPadding = if (index == 0) 10 else 0
             MessageItem(
                 message = message,
                 topExtraPadding = topPadding,
-                onMessageDragged = onMessageDragged
+                onMessageDragged = onMessageDragged,
+                isHighlighted = message.id == highlightedMessageId
             )
         }
     }
@@ -108,8 +127,13 @@ fun MessageItem(
     modifier: Modifier = Modifier,
     message: Message,
     topExtraPadding: Int,
-    onMessageDragged: (Message) -> Unit
+    onMessageDragged: (Message) -> Unit,
+    isHighlighted: Boolean = false
 ) {
+    val density = LocalDensity.current
+    val dragThresholdPx = with(density) { 7.dp.toPx() }
+    val coroutineScope = rememberCoroutineScope()
+
     val dragState = remember {
         AnchoredDraggableState(
             initialValue = DragState.Idle,
@@ -120,6 +144,18 @@ fun MessageItem(
             }
         )
     }
+
+    val alpha by
+    animateFloatAsState(
+        targetValue = 0.2f,
+        animationSpec = tween(3000),
+    )
+
+    val backgroundColor by animateColorAsState(
+        targetValue = WhiteHighlight.copy(alpha = alpha),
+        animationSpec = tween(durationMillis = 3000, easing = LinearOutSlowInEasing),
+        label = "HighlightAnimation"
+    )
 
     LaunchedEffect(dragState) {
         snapshotFlow { dragState.settledValue }
@@ -136,19 +172,46 @@ fun MessageItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .background(if (isHighlighted) backgroundColor else Color.Transparent)
             .padding(top = 2.7.dp + topExtraPadding.dp)
             .padding(bottom = 12.dp)
             .padding(horizontal = 12.dp)
+            .pointerInput(Unit) {
+                var totalHorizontalDrag = 0f
+                var isDragTriggered = false
+
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        totalHorizontalDrag = 0f
+                        isDragTriggered = false
+                    },
+                    onDragEnd = {
+                        coroutineScope.launch { dragState.settle(spring()) }
+                    },
+                    onDragCancel = {
+                        coroutineScope.launch { dragState.settle(spring()) }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        if (!isDragTriggered) {
+                            totalHorizontalDrag += dragAmount
+                            if (abs(totalHorizontalDrag) > dragThresholdPx) {
+                                isDragTriggered = true
+                            }
+                        }
+
+                        if (isDragTriggered) {
+                            dragState.dispatchRawDelta(dragAmount)
+                            change.consume()
+                        }
+                    }
+                )
+            }
             .offset {
                 IntOffset(
                     x = dragState.requireOffset().roundToInt(),
                     y = 0
                 )
             }
-            .anchoredDraggable(
-                state = dragState,
-                orientation = Orientation.Horizontal
-            )
     ) {
         if (message.repliedTo != null && message.repliedMessage != null) {
             val userName = "@${message.repliedMessage.user.username} "
@@ -186,7 +249,7 @@ fun MessageItem(
                 }
             }
             Row(
-                modifier = modifier
+                modifier = Modifier
                     .padding(start = 54.dp)
             ) {
                 Text(
@@ -200,15 +263,15 @@ fun MessageItem(
             verticalAlignment = Alignment.Top
         ) {
             Surface(
-                modifier = modifier.size(40.5.dp),
+                modifier = Modifier.size(40.5.dp),
                 color = Color(0xFF3F3F3F),
                 shape = CircleShape
             ) {
 
             }
-            Spacer(modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
             Column(
-                modifier = modifier
+                modifier = Modifier
                     .padding(top = 2.7.dp)
                     .wrapContentHeight()
             ) {
@@ -235,15 +298,16 @@ fun InputField(
     modifier: Modifier = Modifier,
     textValue: MutableState<String>,
     onSendClicked: () -> Unit,
+    bottomPadding: Int,
     focusRequester: FocusRequester
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 55.dp)
+            .heightIn(min = if (bottomPadding == 0) 60.dp else 55.dp)
             .background(color = Black2)
             .padding(horizontal = 12.dp)
-            .padding(vertical = 5.dp),
+            .padding(vertical = if (bottomPadding == 0) 7.5.dp else 5.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         Surface(

@@ -1,5 +1,6 @@
 package com.orb.hubble.navigation
 
+import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Scaffold
@@ -7,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -19,6 +21,8 @@ import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.ui.screens.CreatePostScreen
 import com.orb.hubble.ui.screens.HomeScreen
 import com.orb.hubble.ui.screens.PostScreen
+import com.orb.hubble.ui.screens.ReplyLogScreen
+import com.orb.hubble.ui.screens.TestMediaScreen
 import com.orb.hubble.ui.screens.ViewStatusScreen
 
 @Composable
@@ -34,6 +38,7 @@ fun MyNavigationHost(
     }
 }
 
+@OptIn(UnstableApi::class)
 fun NavGraphBuilder.homeGraph(
     navController: NavController
 ) {
@@ -48,11 +53,14 @@ fun NavGraphBuilder.homeGraph(
             HomeScreen(
                 userId = "3",
                 viewModel = viewModel,
-                navToViewStatusScreen = { userId ->
-                    navController.navigate(Dest.ViewStatusScreen(userId = userId))
+                navToViewStatusScreen = { pageId ->
+                    navController.navigate(Dest.ViewStatusScreen(pageId = pageId))
                 },
                 navToAddPostScreen = {
                     navController.navigate(Dest.PostScreen)
+                },
+                navToReplyLogScreenTemporary = {
+                    navController.navigate(Dest.ReplyLogScreen)
                 }
             )
         }
@@ -66,8 +74,11 @@ fun NavGraphBuilder.homeGraph(
 
             val viewStatusScreen: Dest.ViewStatusScreen = it.toRoute<Dest.ViewStatusScreen>()
             ViewStatusScreen(
-                userId = viewStatusScreen.userId,
-                viewModel = viewModel
+                pageId = viewStatusScreen.pageId,
+                viewModel = viewModel,
+                onGoBack = {
+                    navController.navigateUp()
+                }
             )
         }
 
@@ -80,6 +91,10 @@ fun NavGraphBuilder.homeGraph(
                     navController.navigateUp()
                 }
             )
+        }
+
+        composable<Dest.ReplyLogScreen> {
+            ReplyLogScreen()
         }
 
         composable<Dest.CreatePostScreen> {

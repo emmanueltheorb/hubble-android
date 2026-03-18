@@ -19,11 +19,14 @@ sealed class Dest {
 
     @Serializable
     data class ViewStatusScreen(
-        val userId: String
+        val pageId: String
     ): Dest()
 
     @Serializable
     data object PostScreen: Dest()
+
+    @Serializable
+    data object ReplyLogScreen: Dest()
 
     @Serializable
     data class CreatePostScreen(

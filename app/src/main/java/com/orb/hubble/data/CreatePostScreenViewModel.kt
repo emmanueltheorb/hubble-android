@@ -49,6 +49,7 @@ import javax.inject.Inject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import androidx.core.graphics.scale
+import java.io.File
 
 @HiltViewModel
 class CreatePostScreenViewModel @Inject constructor(
@@ -217,12 +218,15 @@ class CreatePostScreenViewModel @Inject constructor(
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(context, videoUri)
-                val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
+                val durationMs =
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toLong() ?: 0L
                 val interval = durationMs / thumbnailCount
 
                 for (i in 0 until thumbnailCount) {
                     val timeUs = i * interval * 1000
-                    val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    val bitmap =
+                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     bitmap?.let {
                         val scaled = it.scale(150, 150, false)
                         _thumbnails.update { currentList ->
@@ -399,46 +403,72 @@ class CreatePostScreenViewModel @Inject constructor(
             try {
                 val isVideo = context.contentResolver.getType(mediaUri)?.contains("video") == true
                 val fileName = generateFileName(isVideo)
-                val outputPath = storageStrategy.getFilePath(fileName)
 
-                if (isVideo) {
-                    videoExporter
-                        .exportVideo(
-                            inputUri = mediaUri,
-                            startMs = startMs,
-                            endMs = endMs,
-                            overlayTexts = state.value.overlayTexts,
-                            overlayStickers = state.value.overlayStickers,
-                            outputPath = outputPath
-                        )
-                        .onSuccess { path ->
-                            //uploadFile(filePath = path, fileName = fileName)
-                            shareSheet.shareFile(path)
-                        }
-                        .onFailure { exception ->
-                            Log.e("Export", "Video export failed", exception)
-                        }
+                val isUneditedVideo = if (isVideo) {
+                    val overlayTexts = state.value.overlayTexts
+                    val overlayStickers = state.value.overlayStickers
+
+                    val originalDuration = getLocalVideoDuration(context, mediaUri)
+
+                    overlayTexts.isEmpty() && overlayStickers.isEmpty() && (originalDuration > 0 && (endMs - startMs) >= (originalDuration - 100))
                 } else {
-                    val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
+                    false
+                }
 
-                    mediaExporter
-                        .exportMedia(
-                            backgroundMediaBytes = backgroundMediaBytes,
-                            overlayTexts = state.value.overlayTexts,
-                            overlayStickers = state.value.overlayStickers,
-                            templateSize = state.value.mediaSize,
-                            screenSize = state.value.screenSize,
-                            saveToStorageStrategy = storageStrategy,
-                            fileName = fileName
-                        )
-                        .onSuccess {
-                            //uploadFile(filePath = it, fileName = fileName)
-                            shareSheet.shareFile(it)
-                        }
-                        .onFailure {
-                            it.printStackTrace()
-                        }
+                if (isUneditedVideo) {
+                    Log.d("Export", "Skipping Transformer - Uploading Original")
 
+                    val cachedFile = File(storageStrategy.getFilePath(fileName))
+                    context.contentResolver.openInputStream(mediaUri)?.use { input ->
+                        cachedFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+
+                    uploadFile(filePath = cachedFile.absolutePath, fileName = fileName)
+
+                } else {
+                    val outputPath = storageStrategy.getFilePath(fileName)
+
+                    if (isVideo) {
+                        videoExporter
+                            .exportVideo(
+                                inputUri = mediaUri,
+                                startMs = startMs,
+                                endMs = endMs,
+                                overlayTexts = state.value.overlayTexts,
+                                overlayStickers = state.value.overlayStickers,
+                                outputPath = outputPath
+                            )
+                            .onSuccess { path ->
+                                uploadFile(filePath = path, fileName = fileName)
+                                //shareSheet.shareFile(path)
+                            }
+                            .onFailure { exception ->
+                                Log.e("Export", "Video export failed", exception)
+                            }
+                    } else {
+                        val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
+
+                        mediaExporter
+                            .exportMedia(
+                                backgroundMediaBytes = backgroundMediaBytes,
+                                overlayTexts = state.value.overlayTexts,
+                                overlayStickers = state.value.overlayStickers,
+                                templateSize = state.value.mediaSize,
+                                screenSize = state.value.screenSize,
+                                saveToStorageStrategy = storageStrategy,
+                                fileName = fileName
+                            )
+                            .onSuccess {
+                                uploadFile(filePath = it, fileName = fileName)
+                                //shareSheet.shareFile(it)
+                            }
+                            .onFailure {
+                                it.printStackTrace()
+                            }
+
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("Uri loading Error", "Failed to load image: ${e.message}")
@@ -449,9 +479,24 @@ class CreatePostScreenViewModel @Inject constructor(
 
     private fun generateFileName(isVideo: Boolean): String {
         return if (isVideo) {
-            "media_${System.currentTimeMillis()}.mp4"
+            //"media_${System.currentTimeMillis()}.mp4"
+            "media_video.mp4"
         } else {
-            "media_${System.currentTimeMillis()}.jpg"
+            //"media_${System.currentTimeMillis()}.jpg"
+            "media_image.jpg"
+        }
+    }
+
+    private fun getLocalVideoDuration(context: Context, uri: Uri): Long {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            time?.toLong() ?: 0L
+        } catch (e: Exception) {
+            0L
+        } finally {
+            retriever.release()
         }
     }
 
@@ -467,24 +512,7 @@ data class CreatePostScreenState(
     val screenSize: IntSize = IntSize.Zero,
     val mediaSize: IntSize = IntSize.Zero,
     val isLeavingWithoutSaving: Boolean = false,
-    val overlayTexts: List<TextOverlay> = listOf(
-        TextOverlay(
-            id = "1",
-            text = "Guh",
-            offsetRatioX = 0.5f,
-            offsetRatioY = 0.5f,
-            config = OverlayTextConfig(
-                textStyle = TextStyle(
-                    fontSize = 24.sp,
-                    fontFamily = NunitoFontFamily,
-                    textAlign = TextAlign.Center,
-                    color = Color.Black
-                ),
-                fieldStyle = FieldStyle.Filled,
-                containerColor = Color(0xFF0056FE)
-            )
-        )
-    ),
+    val overlayTexts: List<TextOverlay> = emptyList(),
     val overlayStickers: List<OverlaySticker> = emptyList(),
     val selectedTextOverlay: TextOverlay = TextOverlay(
         id = Uuid.random().toString(),

@@ -3,16 +3,12 @@ package com.orb.hubble.ui.screens
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import android.widget.VideoView
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,19 +47,15 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogWindowProvider
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -72,24 +64,18 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.ContentFrame
-import androidx.media3.ui.compose.PlayerSurface
-import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
-import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
-import androidx.media3.ui.compose.state.rememberPresentationState
 import com.orb.hubble.data.CreatePostScreenViewModel
-import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.ui.components.DraggableContainer
-import com.orb.hubble.ui.components.MessagesSection
 import com.orb.hubble.ui.components.OverlayStickers
 import com.orb.hubble.ui.components.OverlayTextConfig
 import com.orb.hubble.ui.components.OverlayTextField
 import com.orb.hubble.ui.components.TextColorPicker
 import com.orb.hubble.ui.components.getVideoDuration
 import com.orb.hubble.ui.theme.Black1
-import com.orb.hubble.ui.theme.Black2
 import com.orb.hubble.ui.theme.Typography
 import kotlinx.coroutines.delay
 import kotlin.math.min
@@ -247,7 +233,7 @@ fun CreatePostScreen(
             }
             Box {
                 if (isVideo) {
-                    VideoPlayer(
+                    VideoEditorPlayer(
                         modifier = videoSizeGetModifier,
                         uri = uri,
                         startTimeMs = (startTime * 1000).toLong(),
@@ -472,34 +458,33 @@ fun CreatePostScreen(
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayer(
+fun VideoEditorPlayer(
     modifier: Modifier,
     uri: Uri,
     startTimeMs: Long,
     endTimeMs: Long
 ) {
     val context = LocalContext.current
-    val mediaItem = MediaItem.fromUri(uri)
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
+    val exoPlayer = remember(uri) {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_ONE
+        }
     }
 
     LaunchedEffect(uri, startTimeMs, endTimeMs) {
-        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
-        exoPlayer.prepare()
-        exoPlayer.seekTo(startTimeMs)
-        exoPlayer.playWhenReady = true
-    }
+        val mediaItem = MediaItem.Builder()
+            .setUri(uri)
+            .setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(startTimeMs)
+                    .setEndPositionMs(endTimeMs)
+                    .build()
+            )
+            .build()
 
-    LaunchedEffect(exoPlayer, startTimeMs, endTimeMs) {
-        while (true) {
-            if (exoPlayer.currentPosition >= endTimeMs) {
-                exoPlayer.pause()
-                exoPlayer.seekTo(startTimeMs)
-                exoPlayer.playWhenReady = true
-            }
-            delay(500)
-        }
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
     }
 
     DisposableEffect(Unit) {
