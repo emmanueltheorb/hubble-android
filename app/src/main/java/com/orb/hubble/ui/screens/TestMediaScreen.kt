@@ -14,13 +14,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
-import com.orb.hubble.data.PostScreenViewModel
+import com.orb.hubble.data.PickMediaScreenViewModel
 import com.orb.hubble.ui.theme.Black1
 
 @Composable
 fun TestMediaScreen(
     modifier: Modifier = Modifier,
-    viewModel: PostScreenViewModel = hiltViewModel(),
+    viewModel: PickMediaScreenViewModel = hiltViewModel(),
     onMediaSelected: (String) -> Unit,
 ) {
     val pagingItems = viewModel.mediaPager.collectAsLazyPagingItems()

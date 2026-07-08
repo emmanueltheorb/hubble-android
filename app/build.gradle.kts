@@ -90,6 +90,7 @@ dependencies {
     implementation(libs.bundles.coil)
     implementation(libs.bundles.paging)
     implementation(libs.bundles.media3)
+    implementation(libs.blurhash)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.androidx.junit)

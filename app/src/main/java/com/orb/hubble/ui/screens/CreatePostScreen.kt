@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -28,6 +29,7 @@ import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -77,7 +79,6 @@ import com.orb.hubble.ui.components.TextColorPicker
 import com.orb.hubble.ui.components.getVideoDuration
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Typography
-import kotlinx.coroutines.delay
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -89,6 +90,7 @@ fun CreatePostScreen(
     mediaUri: String
 ) {
     val uiState by viewModel.state.collectAsState()
+    val postState by viewModel.postState.collectAsState()
     val editing = remember { mutableStateOf(false) }
     val addSticker = remember { mutableStateOf(false) }
     val screenHeight = LocalWindowInfo.current.containerSize.height.dp
@@ -135,6 +137,9 @@ fun CreatePostScreen(
             endTime = 90f.coerceAtMost(durationMs / 1000f)
 
             viewModel.generateThumbnails(context, uri)
+            viewModel.setPostType(type = "video")
+        } else {
+            viewModel.setPostType(type = "image")
         }
     }
 
@@ -162,6 +167,7 @@ fun CreatePostScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .systemBarsPadding()
             .onSizeChanged {
                 containerSize = Size(it.width.toFloat(), it.height.toFloat())
                 // Optionally track if the screen size changes
@@ -352,9 +358,20 @@ fun CreatePostScreen(
                 color = Color.White
             )
         }
+        TextField(
+            value = postState.description,
+            onValueChange = { value ->
+                viewModel.updateDescription(value = value)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(
+                    y = (-38).dp
+                )
+        )
         TextButton(
             onClick = {
-                viewModel.saveMedia(
+                viewModel.uploadPost(
                     uri,
                     context,
                     startMs = (startTime * 1000).toLong(),

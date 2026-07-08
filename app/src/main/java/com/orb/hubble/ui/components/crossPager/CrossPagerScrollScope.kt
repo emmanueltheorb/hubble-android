@@ -1,0 +1,54 @@
+package com.orb.hubble.ui.components.crossPager
+
+import kotlin.math.roundToInt
+
+/**
+ * A [LazyLayoutScrollScope] that allows customization of animated scroll in [Pager]. The scope
+ * contains information about the layout where animated scroll can be performed as well as the
+ * necessary tools to do that respecting the scroll mutation priority.
+ *
+ * @param state The [PagerState] associated with the layout where this animated scroll should be
+ *   performed.
+ * @param scrollScope The base [ScrollScope] where the scroll session was created.
+ * @return An implementation of [LazyLayoutScrollScope] that works with [HorizontalPager] and
+ *   [VerticalPager].
+ * @sample androidx.compose.foundation.samples.PagerCustomScrollUsingLazyLayoutScrollScopeSample
+ */
+fun LazyLayoutScrollScope(state: CrossPagerState, scrollScope: ScrollScope): LazyLayoutScrollScope {
+    return object : LazyLayoutScrollScope, ScrollScope by scrollScope {
+
+        override val firstVisibleItemIndex: Int
+            get() = state.firstVisiblePage
+
+        override val firstVisibleItemScrollOffset: Int
+            get() = state.firstVisiblePageOffset
+
+        override val lastVisibleItemIndex: Int
+            get() = state.layoutInfo.visiblePagesInfo.last().index
+
+        override val itemCount: Int
+            get() = state.pageCount
+
+        override fun snapToItem(index: Int, offset: Int) {
+            val offsetFraction = offset / state.pageSizeWithSpacing.toFloat()
+            state.snapToItem(index, offsetFraction, forceRemeasure = true)
+        }
+
+        override fun calculateDistanceTo(targetIndex: Int, targetOffset: Int): Int {
+            val displacement =
+                ((targetIndex - state.currentPage) * state.pageSizeWithSpacing -
+                        state.currentPageOffsetFraction * state.pageSizeWithSpacing + targetOffset)
+                    .roundToInt()
+            // coerce the movement within the maximum bounds of the layout
+            val currentScrollWithDisplacementApplied =
+                (state.currentAbsoluteScrollOffset() + displacement).coerceIn(
+                    state.minScrollOffset,
+                    state.maxScrollOffset,
+                )
+
+            // this will return a displacement that doesn't exceed the max scroll offsets
+            return (currentScrollWithDisplacementApplied - state.currentAbsoluteScrollOffset())
+                .toInt()
+        }
+    }
+}

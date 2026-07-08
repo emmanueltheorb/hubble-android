@@ -16,13 +16,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.ui.components.FieldStyle
 import com.orb.hubble.ui.components.OverlayTextConfig
 import com.orb.hubble.ui.screens.OverlaySticker
 import com.orb.hubble.ui.screens.TextOverlay
 import com.orb.hubble.ui.theme.NunitoFontFamily
-import com.orb.hubble.utils.MediaExporter
 import com.orb.hubble.utils.SaveToStorageStrategy
 import com.orb.hubble.utils.StorageShareSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,12 +41,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.io.IOException
 import okio.FileNotFoundException
 import javax.inject.Inject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import androidx.core.graphics.scale
+import com.orb.hubble.repository.HubbleRepository
 import java.io.File
 
 @HiltViewModel
@@ -57,25 +55,28 @@ class CreatePostScreenViewModel @Inject constructor(
     private val videoExporter: VideoMediaExporter,
     private val storageStrategy: SaveToStorageStrategy,
     private val shareSheet: StorageShareSheet,
-    private val postRepository: PostRepository
+    private val repository: HubbleRepository
 ) : ViewModel() {
-    private var hasLoadedInitialData = false
 
     private var uploadJob: Job? = null
 
     private val _state = MutableStateFlow(CreatePostScreenState())
     val state = _state
-        .onStart {
-            if (!hasLoadedInitialData) {
-                /** Load initial data here **/
-                hasLoadedInitialData = true
-            }
-        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000L),
             initialValue = CreatePostScreenState()
         )
+
+    private val _postState = MutableStateFlow(
+        PostState(
+            userId = "f0c7cfbc-604b-437e-bcce-2f6e17e063b7",
+            pageId = "25ff15a5-4728-42b4-a2e9-171662b949f5",
+            type = "video"
+        )
+    )
+
+    val postState = _postState.asStateFlow()
 
     private val _thumbnails = MutableStateFlow<List<Bitmap>>(emptyList())
     val thumbnails: StateFlow<List<Bitmap>> = _thumbnails.asStateFlow()
@@ -83,9 +84,75 @@ class CreatePostScreenViewModel @Inject constructor(
     private val _isLoadingThumbnails = MutableStateFlow(false)
     val isLoadingThumbnails = _isLoadingThumbnails.asStateFlow()
 
-    fun uploadFile(filePath: String, fileName: String) {
-        uploadJob = postRepository
-            .uploadFile(filePath, fileName)
+    fun createMediaPost(filePath: String, fileName: String, postState: PostState) {
+        uploadJob = repository
+            .createPost(filePath, fileName, postState)
+            .onStart {
+                _state.update {
+                    it.copy(
+                        isUploading = true,
+                        isUploadComplete = false,
+                        errorMessage = null,
+                        progress = 0f
+                    )
+                }
+            }
+            .onEach { progressUpdate ->
+                _state.update {
+                    val calculatedProgress = if (progressUpdate.totalBytes > 0) {
+                        progressUpdate.bytesSent / progressUpdate.totalBytes.toFloat()
+                    } else 0f
+                    it.copy(
+                        progress = calculatedProgress
+                    )
+                }
+            }
+            .onCompletion { cause ->
+                if (cause == null) {
+                    _state.update {
+                        it.copy(
+                            isUploading = false,
+                            isUploadComplete = true
+                        )
+                    }
+                    val deleted = File(filePath).delete()
+                    if (deleted) {
+                        Log.d("Storage", "Successfully deleted cached file: $filePath")
+                    } else {
+                        Log.e("Storage", "Failed to delete cached file: $filePath")
+                    }
+                } else if (cause is CancellationException) {
+                    _state.update {
+                        it.copy(
+                            isUploading = false,
+                            errorMessage = "The upload was cancelled!",
+                            isUploadComplete = false,
+                            progress = 0f
+                        )
+                    }
+                }
+            }
+            .catch { cause ->
+                Log.e("UploadError", "Full exception: ", cause)
+                val message = when (cause) {
+                    is OutOfMemoryError -> "File too large!"
+                    is FileNotFoundException -> "File not found!"
+                    is UnresolvedAddressException -> "No internet!"
+                    else -> "${cause.message}"
+                }
+                _state.update {
+                    it.copy(
+                        isUploading = false,
+                        errorMessage = message
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun createTextPost(postState: PostState) {
+        uploadJob = repository
+            .createTextPost(postState)
             .onStart {
                 _state.update {
                     it.copy(
@@ -131,7 +198,7 @@ class CreatePostScreenViewModel @Inject constructor(
                     is OutOfMemoryError -> "File too large!"
                     is FileNotFoundException -> "File not found!"
                     is UnresolvedAddressException -> "No internet!"
-                    else -> "${cause.message}"
+                    else -> "Something went wrong"
                 }
                 _state.update {
                     it.copy(
@@ -398,10 +465,11 @@ class CreatePostScreenViewModel @Inject constructor(
         }
     }
 
-    fun saveMedia(mediaUri: Uri, context: Context, startMs: Long, endMs: Long) {
+    fun uploadPost(mediaUri: Uri, context: Context, startMs: Long, endMs: Long) {
         viewModelScope.launch {
             try {
                 val isVideo = context.contentResolver.getType(mediaUri)?.contains("video") == true
+                val isImage = context.contentResolver.getType(mediaUri)?.contains("image") == true
                 val fileName = generateFileName(isVideo)
 
                 val isUneditedVideo = if (isVideo) {
@@ -425,7 +493,11 @@ class CreatePostScreenViewModel @Inject constructor(
                         }
                     }
 
-                    uploadFile(filePath = cachedFile.absolutePath, fileName = fileName)
+                    createMediaPost(
+                        filePath = cachedFile.absolutePath,
+                        fileName = fileName,
+                        postState = _postState.value.copy(type = "video")
+                        )
 
                 } else {
                     val outputPath = storageStrategy.getFilePath(fileName)
@@ -441,13 +513,17 @@ class CreatePostScreenViewModel @Inject constructor(
                                 outputPath = outputPath
                             )
                             .onSuccess { path ->
-                                uploadFile(filePath = path, fileName = fileName)
+                                createMediaPost(
+                                    filePath = path,
+                                    fileName = fileName,
+                                    postState = _postState.value.copy(type = "video")
+                                )
                                 //shareSheet.shareFile(path)
                             }
                             .onFailure { exception ->
                                 Log.e("Export", "Video export failed", exception)
                             }
-                    } else {
+                    } else if (isImage) {
                         val backgroundMediaBytes = getBytesFromUri(mediaUri, context)
 
                         mediaExporter
@@ -461,13 +537,21 @@ class CreatePostScreenViewModel @Inject constructor(
                                 fileName = fileName
                             )
                             .onSuccess {
-                                uploadFile(filePath = it, fileName = fileName)
+                                createMediaPost(
+                                    filePath = it,
+                                    fileName = fileName,
+                                    postState = _postState.value.copy(type = "image")
+                                )
                                 //shareSheet.shareFile(it)
                             }
                             .onFailure {
                                 it.printStackTrace()
                             }
-
+                    } else {
+                        createTextPost(
+                            postState = _postState.value.copy(type = "text")
+                        )
+                        //call createTextPost here
                     }
                 }
             } catch (e: Exception) {
@@ -479,11 +563,11 @@ class CreatePostScreenViewModel @Inject constructor(
 
     private fun generateFileName(isVideo: Boolean): String {
         return if (isVideo) {
-            //"media_${System.currentTimeMillis()}.mp4"
-            "media_video.mp4"
+            "media_${Uuid.random()}.mp4"
+            //"media_video.mp4"
         } else {
-            //"media_${System.currentTimeMillis()}.jpg"
-            "media_image.jpg"
+            "media_${Uuid.random()}.jpg"
+            //"media_image.jpg"
         }
     }
 
@@ -506,6 +590,22 @@ class CreatePostScreenViewModel @Inject constructor(
                 inputStream.readBytes()
             } ?: byteArrayOf()
         }
+
+    fun updateDescription(value: String) {
+        _postState.update {
+            it.copy(
+                description = value
+            )
+        }
+    }
+
+    fun setPostType(type: String) {
+        _postState.update {
+            it.copy(
+                type = type
+            )
+        }
+    }
 }
 
 data class CreatePostScreenState(
@@ -536,6 +636,19 @@ data class CreatePostScreenState(
     val isUploadComplete: Boolean = false,
     val progress: Float = 0f,
     val errorMessage: String? = null
+)
+
+data class PostState(
+    val userId: String,
+    val pageId: String,
+    val description: String = "",
+    val content: String = "",
+    val contentText: String = "",
+    val contentUrl: String = "",
+    val thumbnailUrl: String = "",
+    val thumbnailAt: String = "1",
+    val type: String,
+    val tags: List<String> = emptyList()
 )
 
 sealed interface OverlayInteraction {

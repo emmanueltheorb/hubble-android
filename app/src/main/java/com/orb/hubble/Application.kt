@@ -2,9 +2,12 @@ package com.orb.hubble
 
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.BackoffPolicy
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import coil3.ImageLoader
@@ -17,11 +20,13 @@ import coil3.request.CachePolicy
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
 import com.orb.hubble.data.workers.MediaCleanupWorker
+import com.orb.hubble.data.workers.SendMessageWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @HiltAndroidApp
 class MyApp : Application(), SingletonImageLoader.Factory, Configuration.Provider {

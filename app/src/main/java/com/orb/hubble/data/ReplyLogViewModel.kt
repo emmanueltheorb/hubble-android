@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.orb.hubble.data.local.MessageDao
 import com.orb.hubble.repository.HubbleRepository
+import com.orb.hubble.utils.ConnectivityObserver
 import com.orb.hubble.utils.VideoCacheManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,14 +23,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @UnstableApi
 @HiltViewModel
 class ReplyLogViewModel @Inject constructor(
     private val repository: HubbleRepository,
-    private val videoCacheManager: VideoCacheManager
+    private val videoCacheManager: VideoCacheManager,
+    private val connectivityObserver: ConnectivityObserver,
 ) : ViewModel() {
     val dataSourceFactory = videoCacheManager.getDataSourceFactory()
+    val isConnected = connectivityObserver
+        .isConnected
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000L),
+            false
+        )
 
     private val _isLoadingPosts = MutableStateFlow(true)
     val isLoadingPosts: StateFlow<Boolean> = _isLoadingPosts.asStateFlow()
@@ -38,46 +49,6 @@ class ReplyLogViewModel @Inject constructor(
     val isLoadingMessageList: StateFlow<Boolean> = _isLoadingMessageList.asStateFlow()
 
     private val _currentUserId = MutableStateFlow<String?>("f0c7cfbc-604b-437e-bcce-2f6e17e063b7")
-
-    private val _currentPostId = MutableStateFlow<String?>("528030b8-1fc2-4a9a-9c98-dbf92d0ab308")
-
-    private val _postId = MutableStateFlow<String?>(null)
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val postList = _postId
-        .flatMapLatest { postId ->
-            if (postId.isNullOrEmpty()) {
-                flowOf(emptyList())
-            } else {
-                repository.getPost(postId)
-            }
-        }
-        .onStart { _isLoadingPosts.value = true }
-        .onEach { _isLoadingPosts.value = false }
-        .catch {
-            _isLoadingPosts.value = true
-            emit(emptyList())
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val messageListForPost = _postId
-        .flatMapLatest { postId ->
-            if (postId.isNullOrEmpty()) {
-                flowOf(emptyList())
-            } else {
-                repository.getAllMessages(postId)
-            }
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val messageList = _currentUserId
@@ -100,42 +71,34 @@ class ReplyLogViewModel @Inject constructor(
             emptyList()
         )
 
-//    @OptIn(ExperimentalCoroutinesApi::class)
-//    val messageList = _currentPostId
-//        .flatMapLatest { postId ->
-//            if (postId.isNullOrEmpty()) {
-//                flowOf(emptyList())
-//            } else {
-//                repository.getAllMessages(postId)
-//            }
-//        }
-//        .onStart { _isLoadingMessageList.value = true }
-//        .onEach { _isLoadingMessageList.value = false }
-//        .catch {
-//            _isLoadingMessageList.value = true
-//            emit(emptyList())
-//        }
-//        .stateIn(
-//            viewModelScope,
-//            SharingStarted.WhileSubscribed(5000),
-//            emptyList()
-//        )
-
-    fun setPostId(postId: String) {
-        _postId.value = postId
-    }
-
+    @OptIn(ExperimentalUuidApi::class)
     fun sendMessage(content: String, postId: String, repliedTo: String? = null) {
         if (_currentUserId.value != null) {
+            val messageId = Uuid.random().toString()
+            val user = User(
+                id = _currentUserId.value!!,
+                username = "AsguarL",
+                color = "",
+                phoneNumber = ""
+            )
+            val postMessageRequest = PostMessageRequest(
+                messageId,
+                _currentUserId.value!!,
+                postId,
+                content,
+                repliedTo
+            )
+
             viewModelScope.launch {
-                repository.sendMessage(
-                    PostMessageRequest(
-                        _currentUserId.value!!,
-                        postId,
-                        content,
-                        repliedTo
-                    )
-                )
+                repository.insertMessageInDb(postMessageRequest, user)
+            }
+
+            if (isConnected.value) {
+                viewModelScope.launch {
+                    repository.sendMessage(postMessageRequest)
+                }
+            } else {
+                repository.setupSendMessageWorker(postMessageRequest)
             }
         }
     }

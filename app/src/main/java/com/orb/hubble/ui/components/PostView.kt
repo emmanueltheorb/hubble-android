@@ -31,10 +31,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -100,6 +103,7 @@ import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
@@ -134,9 +138,6 @@ fun PostView(
     val controller = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    val bottomPadding =
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
-    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
     val screenHeight = LocalWindowInfo.current.containerSize.height.dp
     val bottomSheetHeight = screenHeight * 0.2655f
 
@@ -147,7 +148,7 @@ fun PostView(
     LaunchedEffect(Unit) {
         if (messageId != null) {
             showComments.value = true
-            delay(200)
+            delay(200.milliseconds)
             if (messages.isNotEmpty()) {
                 val index = messages.indexOfFirst { it.id == messageId }
                 repliedMessage = messages[index]
@@ -172,27 +173,28 @@ fun PostView(
         }
     }
 
-    DisposableEffect(Unit) {
-        context.enableEdgeToEdge(
-            navigationBarStyle = SystemBarStyle.dark(
-                android.graphics.Color.TRANSPARENT
-            )
-        )
-
-        onDispose {
-            context.enableEdgeToEdge(
-                navigationBarStyle = SystemBarStyle.dark(
-                    android.graphics.Color.TRANSPARENT
-                )
-            )
-        }
-    }
+//    DisposableEffect(Unit) {
+//        context.enableEdgeToEdge(
+//            navigationBarStyle = SystemBarStyle.dark(
+//                android.graphics.Color.TRANSPARENT
+//            )
+//        )
+//
+//        onDispose {
+//            context.enableEdgeToEdge(
+//                navigationBarStyle = SystemBarStyle.dark(
+//                    android.graphics.Color.TRANSPARENT
+//                )
+//            )
+//        }
+//    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(top = topPadding.dp)
+            .statusBarsPadding()
+            //.padding(top = topPadding.dp)
     ) {
         val currentPost = posts[currentIndex]
         if (currentPost.type.equals("Video", ignoreCase = true)) {
@@ -201,7 +203,8 @@ fun PostView(
                 description = currentPost.description,
                 dataSourceFactory = dataSourceFactory,
                 paddingTop = 1.dp,
-                paddingBottom = if (bottomPadding == 0) 60.dp else 55.dp + bottomPadding.dp,
+                //paddingBottom = if (bottomPadding == 0) 60.dp else 55.dp + bottomPadding.dp,
+                paddingBottom = 55.dp,
                 onGoLeft = {
                     if (!showComments.value) {
                         if (currentIndex > 0) {
@@ -225,9 +228,9 @@ fun PostView(
                     }
                 },
                 onCenterTapped = {
-                    if (showComments.value) {
-                        showComments.value = false
-                    }
+//                    if (showComments.value) {
+//                        showComments.value = false
+//                    }
                 },
                 pausePlay = messageId != null
             )
@@ -236,7 +239,7 @@ fun PostView(
             ImageViewer(
                 imageUrl = currentPost.contentUrl!!,
                 paddingTop = 1.dp,
-                paddingBottom = if (bottomPadding == 0) 60.dp else 55.dp + bottomPadding.dp,
+                paddingBottom = 55.dp,
                 onGoLeft = {
                     if (!showComments.value) {
                         if (currentIndex > 0) {
@@ -266,7 +269,7 @@ fun PostView(
                 contentText = currentPost.contentText!!,
                 backgroundColor = Color.Cyan.copy(alpha = 0.8f),
                 topPadding = 1.dp,
-                bottomPadding = if (bottomPadding == 0) 60.dp else 55.dp + bottomPadding.dp,
+                bottomPadding = 55.dp,
                 onGoLeft = {
                     if (!showComments.value) {
                         if (currentIndex > 0) {
@@ -307,10 +310,10 @@ fun PostView(
                     currentIndex = currentIndex,
                     posts = posts
                 )
-                Spacer(modifier = Modifier.height(15.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier
-                        .padding(horizontal = 15.dp)
+                        .padding(horizontal = 2.dp) //formerly 15.dp
                         .pointerInput(Unit) {
                             detectTapGestures {
                                 /* do nothing */
@@ -318,26 +321,18 @@ fun PostView(
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.go_back_left_icon),
+                    IconBox(
+                        iconId = R.drawable.go_back_left_icon,
                         contentDescription = "go back to home screen",
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.tint(Color.White),
-                        modifier = Modifier
-                            .height(25.dp)
-                            .width(12.dp)
-                            .clickable(onClick = { onGoBack() })
+                        boxSize = 35,
+                        onIconClicked = onGoBack
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Image(
-                        painter = painterResource(R.drawable.more_vert1),
+                    IconBox(
+                        iconId = R.drawable.more_vert1,
                         contentDescription = "viewing status menu",
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.tint(Color.White),
-                        modifier = Modifier
-                            .height(20.dp)
-                            .width(10.dp)
-                            .clickable(onClick = {})
+                        boxSize = 35,
+                        onIconClicked = {}
                     )
                 }
             }
@@ -347,7 +342,6 @@ fun PostView(
                     .fillMaxWidth()
             )
             BottomRow(
-                bottomPadding = bottomPadding,
                 onCommentsClicked = {
                     showComments.value = true
                 },
@@ -366,6 +360,13 @@ fun PostView(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(brush = SolidColor(Color.Black), alpha = alpha)
+                    .pointerInput(Unit) {
+                        detectTapGestures {
+                            if (showComments.value) {
+                                showComments.value = false
+                            }
+                        }
+                    }
             )
         }
 
@@ -386,7 +387,6 @@ fun PostView(
                 modifier = Modifier
                     .align(Alignment.BottomCenter),
                 sheetHeight = bottomSheetHeight,
-                bottomPadding = bottomPadding,
                 onDismiss = { showComments.value = false },
                 dragHandle = { CommentsDragHandle() }
             ) {
@@ -396,14 +396,15 @@ fun PostView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 45.dp)
+                        .imePadding()
                         .height(bottomSheetHeight)
                 ) {
                     MessagesSection(
                         messages = messages,
                         messageId = messageId,
                         bottomPadding = if (repliedMessage != null) {
-                            if (bottomPadding == 0) 92.1.dp else 87.1.dp
-                        } else if (bottomPadding == 0) 60.dp else 55.dp,
+                            87.1.dp
+                        } else 55.dp,
                         onMessageDragged = { message ->
                             controller?.show()
                             repliedMessage = message
@@ -414,8 +415,7 @@ fun PostView(
                     )
                     MessageInput(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .imePadding(),
+                            .align(Alignment.BottomCenter),
                         textInput = textInput,
                         repliedMessage = repliedMessage,
                         onCancelReplyClicked = {
@@ -432,77 +432,8 @@ fun PostView(
                             textInput.value = ""
                             repliedMessage = null
                         },
-                        bottomPadding = bottomPadding,
                         focusRequester = focusRequester
                     )
-//                    Column(
-//                        modifier = Modifier
-//                            .align(Alignment.BottomCenter)
-//                            .imePadding()
-//                    ) {
-//                        if (repliedMessage != null) {
-//                            Row(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .background(Grey2)
-//                                    .padding(horizontal = 13.dp)
-//                                    .padding(vertical = 6.dp),
-//                                verticalAlignment = Alignment.CenterVertically
-//                            ) {
-//                                Text(
-//                                    text = "@${repliedMessage!!.user.username}",
-//                                    fontWeight = FontWeight.Bold,
-//                                    style = Typography.bodySmall,
-//                                    color = repliedMessage!!.user.color.toColor()
-//                                )
-//                                Spacer(Modifier.width(4.5.dp))
-//                                Text(
-//                                    text = repliedMessage!!.content,
-//                                    color = White3,
-//                                    style = Typography.bodySmall,
-//                                    maxLines = 1,
-//                                    overflow = TextOverflow.Ellipsis,
-//                                    modifier = Modifier.weight(1f)
-//                                )
-//                                IconButton(
-//                                    onClick = { repliedMessage = null },
-//                                    shape = CircleShape,
-//                                    colors = IconButtonDefaults.iconButtonColors(
-//                                        containerColor = White1
-//                                    ),
-//                                    modifier = Modifier.size(19.8.dp)
-//                                ) {
-//                                    Icon(
-//                                        painter = painterResource(R.drawable.ic_close),
-//                                        contentDescription = "cancel reply",
-//                                        tint = Black1,
-//                                        modifier = Modifier.size(17.1.dp)
-//                                    )
-//                                }
-//                            }
-//                        }
-//                        if (repliedMessage == null) {
-//                            HorizontalDivider(
-//                                color = Grey2
-//                            )
-//                        }
-//                        InputField(
-//                            textValue = textInput,
-//                            onSendClicked = {
-//                                controller?.hide()
-//                                focusManager.clearFocus()
-//                                onSendMessage(
-//                                    textInput.value,
-//                                    posts[currentIndex].id,
-//                                    repliedMessage?.id
-//                                )
-//                                textInput.value = ""
-//                                repliedMessage = null
-//                            },
-//                            bottomPadding = bottomPadding,
-//                            focusRequester = focusRequester
-//                        )
-//                    }
                 }
             }
         }
@@ -547,20 +478,19 @@ fun ProgressIndicator(
 @Composable
 fun BottomRow(
     modifier: Modifier = Modifier,
-    bottomPadding: Int,
     onCommentsClicked: () -> Unit,
     post: Post
 ) {
     Box(
         modifier = modifier
-            .background(Black3) //formerly Black3
-            .padding(bottom = bottomPadding.dp),
+            .background(Black3)
+            .navigationBarsPadding(),
         contentAlignment = Alignment.TopCenter
     ) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .height(if (bottomPadding == 0) 60.dp else 55.dp),
+                .height(55.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -616,9 +546,6 @@ fun BottomRow(
                         modifier = modifier.size(35.dp)//45.dp
                     )
                 }
-            }
-            if (bottomPadding == 0) {
-                Spacer(Modifier.height(5.dp))
             }
         }
     }
@@ -681,7 +608,6 @@ fun MessageInput(
     repliedMessage: Message?,
     onCancelReplyClicked: () -> Unit,
     onSendClicked: () -> Unit,
-    bottomPadding: Int,
     focusRequester: FocusRequester
 ) {
     Column(
@@ -702,7 +628,6 @@ fun MessageInput(
         InputField(
             textValue = textInput,
             onSendClicked = onSendClicked,
-            bottomPadding = bottomPadding,
             focusRequester = focusRequester
         )
     }

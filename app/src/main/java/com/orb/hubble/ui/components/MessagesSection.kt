@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -83,7 +84,7 @@ fun MessagesSection(
     modifier: Modifier = Modifier,
     messages: List<Message>,
     messageId: String? = null,
-    bottomPadding: Dp = 55.dp,
+    bottomPadding: Dp = 55.dp, //formerly 55.dp
     onMessageDragged: (Message) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -283,11 +284,27 @@ fun MessageItem(
                     ),
                     color = message.user.color.toColor()
                 )
-                Text(
-                    text = message.content,
-                    color = White3,
-                    style = Typography.bodySmall
-                )
+                Row(
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = message.content,
+                        color = White3,
+                        style = Typography.bodySmall
+                    )
+                    if (message.pending) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Icon(
+                                painter = painterResource(R.drawable.pending_icon),
+                                tint = WhiteHighlight,
+                                contentDescription = "message send pending",
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                }
             }
         }
     }
@@ -298,16 +315,15 @@ fun InputField(
     modifier: Modifier = Modifier,
     textValue: MutableState<String>,
     onSendClicked: () -> Unit,
-    bottomPadding: Int,
     focusRequester: FocusRequester
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (bottomPadding == 0) 60.dp else 55.dp)
+            .heightIn(min = 55.dp)
             .background(color = Black2)
             .padding(horizontal = 12.dp)
-            .padding(vertical = if (bottomPadding == 0) 7.5.dp else 5.dp),
+            .padding(vertical = 5.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         Surface(
@@ -393,6 +409,7 @@ fun InputField(
 
 fun String.toColor(): Color {
     return try {
+        if (this.isEmpty()) return Color.White
         Color(this.toColorInt())
     } catch (e: IllegalArgumentException) {
         Color.White

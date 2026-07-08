@@ -21,24 +21,15 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface UserRepository {
-    val followedPages: StateFlow<List<String>>
-    val contacts: StateFlow<List<String>>
-
-    suspend fun getFollowedPages(pageId: String)
-    suspend fun getContacts(userId: String)
-}
-
-@Singleton
-class UserRepositoryImpl @Inject constructor(
+class UserRepository (
     private val websocketService: WebsocketService // Your API service
-) : UserRepository {
+) {
 
     private val _followedPages = MutableStateFlow<List<String>>(emptyList())
-    override val followedPages: StateFlow<List<String>> = _followedPages.asStateFlow()
+    val followedPages: StateFlow<List<String>> = _followedPages.asStateFlow()
 
     private val _contacts = MutableStateFlow<List<String>>(emptyList())
-    override val contacts: StateFlow<List<String>> = _contacts.asStateFlow()
+    val contacts: StateFlow<List<String>> = _contacts.asStateFlow()
 
     init {
         observeWebSocketEvents()
@@ -76,11 +67,11 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFollowedPages(pageId: String) {
+    suspend fun getFollowedPages(pageId: String) {
         websocketService.sendEvent(ClientEvent.GetFollowedPages(pageId))
     }
 
-    override suspend fun getContacts(userId: String) {
+    suspend fun getContacts(userId: String) {
         websocketService.sendEvent(ClientEvent.GetContacts(userId))
     }
 

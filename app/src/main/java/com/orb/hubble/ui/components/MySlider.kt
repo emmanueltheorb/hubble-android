@@ -311,7 +311,7 @@ fun rememberMySliderState(
 @ExperimentalMaterial3Api
 class MySliderState(
     value: Float = 0f,
-    @IntRange(from = 0) val steps: Int = 0,
+    @param: IntRange(from = 0) val steps: Int = 0,
     var onValueChangeFinished: (() -> Unit)? = null,
     val valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
 ) : DraggableState {

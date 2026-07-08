@@ -20,8 +20,10 @@ import com.orb.hubble.data.VideoMediaExporter
 import com.orb.hubble.data.local.PostDatabase.Companion.migration7to8
 import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.repository.UserRepository
-import com.orb.hubble.repository.UserRepositoryImpl
+import com.orb.hubble.service.ApiService
 import com.orb.hubble.service.WebsocketService
+import com.orb.hubble.utils.AndroidConnectivityObserver
+import com.orb.hubble.utils.ConnectivityObserver
 import com.orb.hubble.utils.FileReader
 import com.orb.hubble.utils.MediaPagingSource
 import com.orb.hubble.utils.SaveToStorageStrategy
@@ -75,6 +77,7 @@ object AppModule {
     @Provides
     fun providePostDatabase(@ApplicationContext context: Context): PostDatabase =
         Room.databaseBuilder(context, PostDatabase::class.java, "post.db")
+            .fallbackToDestructiveMigration(true)
             .build()
 
     @Provides
@@ -86,21 +89,31 @@ object AppModule {
     @Provides
     fun provideCacheEntryDao(database: PostDatabase): CacheEntryDao = database.cacheEntryDao
 
+//    @Provides
+//    @Singleton
+//    fun providePostRepository(@ApplicationContext context: Context): PostRepository =
+//        PostRepository(fileReader = FileReader(context))
+
     @Provides
     @Singleton
-    fun providePostRepository(@ApplicationContext context: Context): PostRepository =
-        PostRepository(fileReader = FileReader(context))
+    fun provideApiService(@ApplicationContext context: Context): ApiService =
+        ApiService(fileReader = FileReader(context))
+    
 
     @Provides
     @Singleton
     fun provideFileReader(@ApplicationContext context: Context): FileReader =
         FileReader(context = context)
 
+    @Provides
+    @Singleton
+    fun provideConnectivityObserver(@ApplicationContext context: Context): ConnectivityObserver =
+        AndroidConnectivityObserver(context = context)
 
     @Provides
     @Singleton
     fun provideUserRepository(websocketService: WebsocketService): UserRepository =
-        UserRepositoryImpl(websocketService)
+        UserRepository(websocketService)
 
     @Provides
     @Singleton

@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.collectLatest
 fun MyBottomSheet(
     modifier: Modifier = Modifier,
     sheetHeight: Dp,
-    bottomPadding: Int,
     sheetColor: Color = Black2,
     onDismiss: () -> Unit,
     dragHandle: @Composable (() -> Unit),

@@ -14,7 +14,7 @@ import com.orb.hubble.data.User
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
-@Database(entities = [Post::class, Message::class, CacheEntry::class], version = 9)
+@Database(entities = [Post::class, Message::class, CacheEntry::class], version = 10)
 @TypeConverters(Converters::class)
 abstract class PostDatabase : RoomDatabase() {
 

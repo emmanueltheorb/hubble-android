@@ -1,12 +1,23 @@
 package com.orb.hubble.data
 
+import android.content.Context
 import android.util.Log
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.orb.hubble.data.workers.SendMessageWorker
+import com.orb.hubble.repository.HomeScreenPostState
 import com.orb.hubble.repository.HubbleRepository
 import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.repository.UserRepository
+import com.orb.hubble.utils.ConnectivityObserver
 import com.orb.hubble.utils.SaveToStorageStrategy
 import com.orb.hubble.utils.StorageShareSheet
 import com.orb.hubble.utils.VideoCacheManager
@@ -29,21 +40,31 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.collections.plus
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @UnstableApi
 @HiltViewModel
 class HomeScreenViewModel @Inject constructor(
+    private val connectivityObserver: ConnectivityObserver,
     private val repository: HubbleRepository,
     private val userRepository: UserRepository,
     private val postRepository: PostRepository,
     private val videoCacheManager: VideoCacheManager
 ) : ViewModel() {
     val dataSourceFactory = videoCacheManager.getDataSourceFactory()
+    val isConnected = connectivityObserver
+        .isConnected
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000L),
+            false
+        )
 
     private val _state = MutableStateFlow(HomeScreenState())
     val state: StateFlow<HomeScreenState> = _state.asStateFlow()
@@ -54,16 +75,7 @@ class HomeScreenViewModel @Inject constructor(
     private val _currentPostId = MutableStateFlow<String?>(null)
     private val _currentPostPageId = MutableStateFlow<String?>(null)
 
-    // Add these to your ViewModel
-    private val _selectedTab = MutableStateFlow(PostFilterTab.ALL)
-    val selectedTab: StateFlow<PostFilterTab> = _selectedTab.asStateFlow()
-
-    val postsFromDb = repository.getAllPosts()
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
+    val selectedTab: StateFlow<PostFilterTab> = postRepository.selectedTab
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val messagesFromDb = _currentPostId
@@ -80,104 +92,23 @@ class HomeScreenViewModel @Inject constructor(
             emptyList()
         )
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val pagePosts = _currentPostPageId
-        .flatMapLatest { pageId ->
-            if (pageId.isNullOrEmpty()) {
-                flowOf(emptyList())
-            } else {
-                repository.getPagePosts(pageId)
-                    .onStart { _isLoadingPosts.value = true }
-                    .onEach { _isLoadingPosts.value = false }
-                    .catch {
-                        _isLoadingPosts.value = false
-                        emit(emptyList())
-                    }
+    val myPosts: StateFlow<List<Post>> = postRepository.myPosts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val postsState: StateFlow<HomeScreenPostState> = postRepository.homeScreenPostState
+        .onStart { _isLoadingPosts.value = true }
+        .onEach { _isLoadingPosts.value = false }
+        .catch {
+            _isLoadingPosts.value = true
+            emit(HomeScreenPostState())
+            _state.update {
+                it.copy(error = "Error loading posts")
             }
         }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeScreenPostState())
 
-    // Filter posts based on current tab
-    val filteredPosts: StateFlow<Map<String, List<Post>>> =
-        combine(_state, _selectedTab, postsFromDb) { state, tab, posts ->
-            val postMap = posts.groupBy { it.pageId }
-
-            when (tab) {
-                PostFilterTab.ALL -> postMap
-                PostFilterTab.FOLLOWING -> postMap.filterKeys { it in state.followedPagesIds }
-                PostFilterTab.CONTACTS -> postMap.filterKeys { it in state.contactsUserIds }
-            }
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyMap()
-        )
-
-    val myPosts: StateFlow<List<Post>> =
-        combine(postsFromDb, _state) { posts, state ->
-
-            posts.groupBy { it.pageId }[state.pageId] ?: emptyList()
-
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val postsState: StateFlow<PostsState> =
-        combine(postsFromDb, _state, _selectedTab) { posts, state, tab ->
-            val statuses = posts.groupBy { it.pageId }
-                .map { (pageId, posts) ->
-                    Status(
-                        pageId = pageId,
-                        ownerId = posts.first().page.ownerId,
-                        posts = posts,
-                        username = posts.first().page.name,
-                        profilePic = ""
-                    )
-                }
-
-            PostsState(
-                allTabRecentPosts = statuses
-                    .filter { it.pageId != state.pageId && !it.seenAll }
-                    .sortedByDescending { it.lastestUpdate },
-                allTabViewedPosts = statuses
-                    .filter { it.pageId != state.pageId && it.seenAll }
-                    .sortedByDescending { it.lastestUpdate },
-                followingTabRecentPosts = statuses
-                    .filter { it.pageId in state.followedPagesIds && it.pageId != state.pageId && !it.seenAll }
-                    .sortedByDescending { it.lastestUpdate },
-                followingTabViewedPosts = statuses
-                    .filter { it.pageId in state.followedPagesIds && it.pageId != state.pageId && it.seenAll }
-                    .sortedByDescending { it.lastestUpdate },
-                contactsTabRecentPosts = statuses
-                    .filter { it.ownerId in state.contactsUserIds && it.pageId != state.pageId && !it.seenAll }
-                    .sortedByDescending { it.lastestUpdate },
-                contactsTabViewedPosts = statuses
-                    .filter { it.ownerId in state.contactsUserIds && it.pageId != state.pageId && it.seenAll }
-                    .sortedByDescending { it.lastestUpdate }
-            )
-
-        }
-            .flowOn(Dispatchers.Default)
-            .onStart { _isLoadingPosts.value = true }
-            .onEach { _isLoadingPosts.value = false }
-            .catch {
-                _isLoadingPosts.value = true
-                emit(PostsState())
-                _state.update {
-                    it.copy(error = "Error loading posts")
-                }
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PostsState())
-
-    val statuses: StateFlow<List<Status>> = combine(postsState, _selectedTab) { state, tab ->
-        when (tab) {
-            PostFilterTab.ALL -> state.allTabRecentPosts + state.allTabViewedPosts
-            PostFilterTab.FOLLOWING -> state.followingTabRecentPosts + state.followingTabViewedPosts
-            PostFilterTab.CONTACTS -> state.contactsTabRecentPosts + state.contactsTabViewedPosts
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val statuses: StateFlow<List<Status>> = postRepository.homeScreenStatuses
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         connect()
@@ -252,36 +183,35 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
-    fun createPost(
-        contentUrl: String,
-        description: String? = null,
-        contentText: String? = null,
-        tags: List<String>? = null,
-        pageId: String
-    ) {
-        viewModelScope.launch {
-            repository.createPost(
-                CreatePostRequest(
-                    contentUrl,
-                    description,
-                    contentText,
-                    tags
-                ),
-                pageId
-            )
-        }
-    }
-
+    @OptIn(ExperimentalUuidApi::class)
     fun sendMessage(content: String, postId: String, repliedTo: String? = null) {
+        val messageId = Uuid.random().toString()
+        val user = User(
+            id = _state.value.userId,
+            username = "AsguarL",
+            color = "",
+            phoneNumber = ""
+        )
+        val postMessageRequest = PostMessageRequest(
+            messageId,
+            state.value.userId,
+            postId,
+            content,
+            repliedTo
+        )
+
         viewModelScope.launch {
-            repository.sendMessage(
-                PostMessageRequest(
-                    state.value.userId,
-                    postId,
-                    content,
-                    repliedTo
-                )
-            )
+            repository.insertMessageInDb(postMessageRequest, user)
+        }
+
+        if (isConnected.value) {
+            viewModelScope.launch {
+                repository.sendMessage(postMessageRequest)
+            }
+            Log.d("isConnected", "isConnected is ${isConnected.value} instead of true")
+        } else {
+            repository.setupSendMessageWorker(postMessageRequest)
+            Log.d("isConnected", "isConnected is ${isConnected.value} instead of false")
         }
     }
 
@@ -292,8 +222,7 @@ class HomeScreenViewModel @Inject constructor(
     }
 
     fun setSelectedTab(tab: PostFilterTab) {
-        _selectedTab.value = tab
-        _state.update { it.copy(selectedTab = tab) }
+        postRepository.setSelectedTab(tab)
     }
 
     private fun observeUserRelations() {
@@ -352,13 +281,4 @@ data class HomeScreenState @OptIn(ExperimentalUuidApi::class) constructor(
     val selectedTab: PostFilterTab = PostFilterTab.ALL,
     val followedPagesIds: Set<String> = emptySet(),
     val contactsUserIds: Set<String> = emptySet()
-)
-
-data class PostsState(
-    val allTabRecentPosts: List<Status> = emptyList(),
-    val allTabViewedPosts: List<Status> = emptyList(),
-    val followingTabRecentPosts: List<Status> = emptyList(),
-    val followingTabViewedPosts: List<Status> = emptyList(),
-    val contactsTabRecentPosts: List<Status> = emptyList(),
-    val contactsTabViewedPosts: List<Status> = emptyList()
 )

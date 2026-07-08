@@ -29,6 +29,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class WebsocketService @Inject constructor() {
     private val json = Json {
@@ -40,7 +41,7 @@ class WebsocketService @Inject constructor() {
     private val client = HttpClient(OkHttp) {
         install(WebSockets) {
             contentConverter = KotlinxWebsocketSerializationConverter(json)
-            pingInterval = 3.milliseconds
+            pingInterval = 30.seconds
         }
     }
 
@@ -50,7 +51,10 @@ class WebsocketService @Inject constructor() {
     private var websocketSession: DefaultClientWebSocketSession? = null
     private var job: Job? = null
 
-    suspend fun connect(userId: String, url: String = "wss://roma-hexaplaric-trilaterally.ngrok-free.dev/ws") {
+    suspend fun connect(
+        userId: String,
+        url: String = "wss://roma-hexaplaric-trilaterally.ngrok-free.dev/ws"
+    ) {
         try {
             client.webSocket("$url?user_id=$userId") {
                 websocketSession = this
@@ -58,39 +62,43 @@ class WebsocketService @Inject constructor() {
                 // Send Connection Event
                 _events.emit(WebsocketEvent.Connected("Connected"))
 
-                // Listen for incoming messages
-                job = CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        for (frame in incoming) {
-                            when (frame) {
-                                is Frame.Text -> {
-                                    val text = frame.readText()
-                                    Log.d("Websocket", "Received: $text")
-                                    handleIncomingMessage(text)
-                                }
-                                is Frame.Binary -> {
-                                    // Handle Binary if needed
-                                }
-                                else -> {}
+                try {
+                    for (frame in incoming) {
+                        when (frame) {
+                            is Frame.Text -> {
+                                val text = frame.readText()
+                                Log.d("Websocket", "Received: $text")
+                                handleIncomingMessage(text)
                             }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("Websocket", "Error in message loop: ${e.message}")
-                        _events.emit(WebsocketEvent.Error(e.message ?: "Connection error"))
-                    }
-                }
 
-                job?.join()
+                            is Frame.Binary -> {
+                                // Handle Binary if needed
+                            }
+
+                            else -> {}
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("Websocket", "Error in message loop: ${e.message}")
+                    _events.emit(WebsocketEvent.Error(e.message ?: "Connection error"))
+                } finally {
+                    websocketSession = null
+                }
             }
         } catch (e: Exception) {
             Log.e("Websocket", "Connection Error: ${e.message}")
             _events.emit(WebsocketEvent.Error(e.message ?: "Connection failed"))
         } finally {
+            websocketSession = null
             _events.emit(WebsocketEvent.Disconnected)
         }
     }
 
     suspend fun sendEvent(event: ClientEvent) {
+        if (websocketSession == null) {
+            Log.e("Websocket", "Cannot send: No active session")
+            return
+        }
         try {
             val jsonString = when (event) {
                 is ClientEvent.CreatePost -> event.toJson(json)
@@ -103,6 +111,7 @@ class WebsocketService @Inject constructor() {
             }
 
             websocketSession?.send(Frame.Text(jsonString))
+            Log.d("Websocket", "Sent message $jsonString")
         } catch (e: Exception) {
             Log.e("Websocket", "Send error: ${e.message}")
             _events.emit(WebsocketEvent.Error("Failed to send message: ${e.message}"))
@@ -120,30 +129,35 @@ class WebsocketService @Inject constructor() {
                     )
                     _events.emit(WebsocketEvent.NewPost(post))
                 }
+
                 "missed_post" -> {
                     val post = json.decodeFromJsonElement<Post>(
                         jsonObject["post"] ?: return
                     )
                     _events.emit(WebsocketEvent.MissedPost(post = post))
                 }
+
                 "post_message" -> {
                     val message = json.decodeFromJsonElement<Message>(
                         jsonObject["message"] ?: return
                     )
                     _events.emit(WebsocketEvent.PostMessage(message = message))
                 }
+
                 "followed_ids" -> {
                     val list = json.decodeFromJsonElement<List<String>>(
                         jsonObject["followedPages"] ?: return
                     )
                     _events.emit(WebsocketEvent.FollowedPages(followedPages = list))
                 }
+
                 "contact_ids" -> {
                     val list = json.decodeFromJsonElement<List<String>>(
                         jsonObject["contacts"] ?: return
                     )
                     _events.emit(WebsocketEvent.Contacts(contacts = list))
                 }
+
                 else -> {
                     // Handle connection messages or other types
                     if (text.contains("Connected")) {

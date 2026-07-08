@@ -88,6 +88,7 @@ import com.orb.hubble.data.Page
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.Status
 import com.orb.hubble.data.User
+import com.orb.hubble.data.ViewingPostViewModel
 import com.orb.hubble.data.messageList
 import com.orb.hubble.data.postList1
 import com.orb.hubble.ui.components.InputField
@@ -113,15 +114,17 @@ import kotlin.time.Instant
 @Composable
 fun ViewStatusScreen(
     modifier: Modifier = Modifier,
-    pageId: String = "3",
-    viewModel: HomeScreenViewModel = hiltViewModel(),
+    pageId: String? = null,
+    postId: String? = null,
+    messageId: String? = null,
+    viewModel: ViewingPostViewModel = hiltViewModel(),
     onGoBack: () -> Unit
 ) {
-    LaunchedEffect(pageId) {
-        viewModel.setPostPageId(pageId)
-    }
+//    LaunchedEffect(pageId) {
+//        viewModel.setPostPageId(pageId)
+//    }
 
-    val uiState by viewModel.state.collectAsState()
+    val hasInternet by viewModel.isConnected.collectAsState()
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
 //    val statuses = listOf(
 //        Status(
@@ -134,34 +137,34 @@ fun ViewStatusScreen(
 //    )
     val isLoading by viewModel.isLoadingPosts.collectAsState()
 
-    val messages by viewModel.messagesFromDb.collectAsStateWithLifecycle()
+    val messages by viewModel.messages.collectAsStateWithLifecycle()
     //val messages = messageList
 
     val context = LocalActivity.current as ComponentActivity
 
-    DisposableEffect(Unit) {
-        context.enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.dark(
-                android.graphics.Color.TRANSPARENT
-            )
-        )
-
-        onDispose {
-            context.enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.auto(
-                    android.graphics.Color.TRANSPARENT,
-                    android.graphics.Color.TRANSPARENT
-                ),
-                navigationBarStyle = SystemBarStyle.dark(
-                    android.graphics.Color.TRANSPARENT
-                )
-            )
-        }
-    }
+//    DisposableEffect(Unit) {
+//        context.enableEdgeToEdge(
+//            statusBarStyle = SystemBarStyle.light(
+//                android.graphics.Color.TRANSPARENT,
+//                android.graphics.Color.TRANSPARENT
+//            ),
+//            navigationBarStyle = SystemBarStyle.dark(
+//                android.graphics.Color.TRANSPARENT
+//            )
+//        )
+//
+//        onDispose {
+//            context.enableEdgeToEdge(
+//                statusBarStyle = SystemBarStyle.auto(
+//                    android.graphics.Color.TRANSPARENT,
+//                    android.graphics.Color.TRANSPARENT
+//                ),
+//                navigationBarStyle = SystemBarStyle.dark(
+//                    android.graphics.Color.TRANSPARENT
+//                )
+//            )
+//        }
+//    }
 
     Box(
         modifier = modifier
@@ -171,9 +174,11 @@ fun ViewStatusScreen(
         if (!isLoading) {
             PostViewer(
                 initialPageId = pageId,
+                postId = postId,
                 statuses = statuses,
                 dataSourceFactory = viewModel.dataSourceFactory,
                 messages = messages,
+                messageId = messageId,
                 onJoinPost = { postId, time ->
                     viewModel.joinPost(postId = postId, from = time)
                 },

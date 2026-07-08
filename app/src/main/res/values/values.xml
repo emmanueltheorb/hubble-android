@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="my_compose_prefetch_scheduler" type="id"/>
+    <string name="my_foundation_autofill">Autofill</string>
+    <string name="my_tooltip_description">tooltip</string>
+    <string name="my_tooltip_label">show tooltip</string>
+</resources>

@@ -27,10 +27,12 @@ import kotlin.time.Instant
 @Composable
 fun PostViewer(
     modifier: Modifier = Modifier,
-    initialPageId: String,
+    initialPageId: String?,
+    postId: String?,
     statuses: List<Status>,
     dataSourceFactory: DataSource.Factory,
     messages: List<Message>,
+    messageId: String?,
     onJoinPost: (String, Instant?) -> Unit,
     onPreloadNextPost: (String?, String) -> Unit,
     onSendMessage: (String, String, String?) -> Unit,
@@ -110,6 +112,7 @@ fun PostViewer(
                     PostView(
                         posts = currentStatus.posts,
                         messages = messages,
+                        messageId = messageId,
                         onGoToNextPage = { goToNextPage() },
                         onGoToPrevPage = { goToPrevPage() },
                         dataSourceFactory = dataSourceFactory,

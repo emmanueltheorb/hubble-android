@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
@@ -50,13 +53,20 @@ import com.orb.hubble.R
 import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.PostFilterTab
-import com.orb.hubble.data.PostsState
 import com.orb.hubble.data.User
+import com.orb.hubble.repository.HomeScreenPostState
 //import com.orb.hubble.data.postsList10
 //import com.orb.hubble.data.postsList4
 import com.orb.hubble.ui.components.StatusItem
 import com.orb.hubble.ui.theme.Black1
+import com.orb.hubble.ui.theme.Black2
+import com.orb.hubble.ui.theme.Black3
+import com.orb.hubble.ui.theme.Black4
+import com.orb.hubble.ui.theme.Black6
+import com.orb.hubble.ui.theme.Black7
+import com.orb.hubble.ui.theme.Blue2
 import com.orb.hubble.ui.theme.Blue3
+import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.Grey3
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
@@ -77,7 +87,6 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.state.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val filteredPosts by viewModel.filteredPosts.collectAsStateWithLifecycle()
     val postsState by viewModel.postsState.collectAsState()
     val myStatus by viewModel.myPosts.collectAsState()
     val scope = rememberCoroutineScope()
@@ -98,15 +107,16 @@ fun HomeScreen(
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collectLatest {
-            viewModel.setSelectedTab(PostFilterTab.entries.get(pagerState.currentPage))
+            viewModel.setSelectedTab(PostFilterTab.entries[pagerState.currentPage])
         }
     }
 
     Box(
         modifier = Modifier
-            .background(color = Black1)
-            .padding(top = topPadding.dp)
-            .padding(bottom = bottomPadding.dp)
+            .background(color = Black3)
+            .statusBarsPadding()
+            //.padding(top = topPadding.dp)
+            //.padding(bottom = 66.dp)
     ) {
         LazyColumn(
             modifier = modifier
@@ -181,7 +191,6 @@ fun HomeScreen(
             item {
                 Posts(
                     state = pagerState,
-                    filteredPosts = filteredPosts,
                     postsState = postsState,
                     navToViewStatusScreen = { pageId ->
                         navToViewStatusScreen(pageId)
@@ -193,6 +202,14 @@ fun HomeScreen(
             topPadding = topPadding,
             onSearchClicked = navToAddPostScreen,
             onThreeDotClicked = navToReplyLogScreenTemporary
+        )
+        AddPostButtons(
+            modifier = Modifier
+                .align(Alignment.BottomEnd),
+            onAddTextPostClicked = {
+
+            },
+            onAddMediaPostClicked = navToAddPostScreen
         )
     }
 }
@@ -320,6 +337,54 @@ private fun TopBar(
 }
 
 @Composable
+private fun AddPostButtons(
+    modifier: Modifier = Modifier,
+    onAddTextPostClicked: () -> Unit,
+    onAddMediaPostClicked: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .padding(horizontal = 17.dp)
+            .padding(bottom = 25.dp),
+        verticalArrangement = Arrangement.spacedBy(17.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color = Black6)
+                .clickable(onClick = onAddTextPostClicked),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.pen_icon),
+                contentDescription = "Add media post",
+                tint = White1,
+                modifier = Modifier
+                    .padding(10.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(55.dp)
+                .clip(CircleShape)
+                .background(color = White1)
+                .clickable(onClick = onAddMediaPostClicked),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.plus_icon2),
+                contentDescription = "Add media post",
+                tint = Black1,
+                modifier = Modifier
+                    .padding(19.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun SelectableText(
     modifier: Modifier = Modifier,
     text: String,
@@ -339,8 +404,7 @@ fun SelectableText(
 fun Posts(
     modifier: Modifier = Modifier,
     state: PagerState,
-    filteredPosts: Map<String, List<Post>>,
-    postsState: PostsState,
+    postsState: HomeScreenPostState,
     navToViewStatusScreen: (String) -> Unit
 ) {
     HorizontalPager(
@@ -358,15 +422,6 @@ fun Posts(
                         .heightIn(900.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
-//                    filteredPosts.entries.forEach { (_, postList) ->
-//                        StatusItem(
-//                            posts = postList,
-//                            username = postList[0].page.name,
-//                            onStatusClicked = { pageId ->
-//                                navToViewStatusScreen(pageId)
-//                            }
-//                        )
-//                    }
                     postsState.allTabRecentPosts.forEach {
                         StatusItem(
                             posts = it.posts,

@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +27,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -87,6 +90,7 @@ import com.orb.hubble.ui.components.MessageInput
 import com.orb.hubble.ui.components.PostView
 import com.orb.hubble.ui.components.toColor
 import com.orb.hubble.ui.theme.Black1
+import com.orb.hubble.ui.theme.Black3
 import com.orb.hubble.ui.theme.Grey2
 import com.orb.hubble.ui.theme.NunitoFontFamily
 import com.orb.hubble.ui.theme.Typography
@@ -103,21 +107,14 @@ import kotlin.math.roundToInt
 @Composable
 fun ReplyLogScreen(
     modifier: Modifier = Modifier,
-    viewModel: ReplyLogViewModel = hiltViewModel()
+    viewModel: ReplyLogViewModel = hiltViewModel(),
+    onMessageClicked: (postId: String, messageId: String) -> Unit
 ) {
-    val postList by viewModel.postList.collectAsState()
     val messageList by viewModel.messageList.collectAsState()
-    val postMessages by viewModel.messageListForPost.collectAsStateWithLifecycle()
 
     val isLoadingMessageList by viewModel.isLoadingMessageList.collectAsStateWithLifecycle()
     val isLoadingPosts by viewModel.isLoadingPosts.collectAsStateWithLifecycle()
-    var showPostView by remember { mutableStateOf(false) }
     var showInputField by remember { mutableStateOf(false) }
-    var messageClicked by remember { mutableStateOf<String?>(null) }
-
-    val bottomPadding =
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
-    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
 
     val scope = rememberCoroutineScope()
 
@@ -131,25 +128,25 @@ fun ReplyLogScreen(
     if (!isLoadingMessageList) {
         Box(
             modifier = modifier
-                .background(Black1)
-                .statusBarsPadding()
+                .background(Black3)
+                .systemBarsPadding()
         ) {
             LazyColumn(
-                modifier = Modifier.height(900.dp)
+                modifier = Modifier.height(900.dp),
+                verticalArrangement = Arrangement.spacedBy(25.dp)
             ) {
+                item {
+                    TopBar(
+                        onThreeDotClicked = {
+
+                        }
+                    )
+                }
                 items(messageList) { message ->
                     ReplyLogMessageItem(
                         message = message,
                         onMessageClicked = { message ->
-                            viewModel.setPostId(message.postId)
-                            scope.launch {
-                                snapshotFlow { isLoadingPosts }.first { isLoading ->
-                                    !isLoading
-                                }
-                                delay(500)
-                                messageClicked = message.id
-                                showPostView = true
-                            }
+                            onMessageClicked(message.postId, message.id)
                         },
                         onMessageDragged = { message ->
                             showInputField = true
@@ -184,38 +181,8 @@ fun ReplyLogScreen(
                             )
                         }
                     },
-                    bottomPadding = bottomPadding,
                     focusRequester = focusRequester
                 )
-            }
-
-            if (showPostView) {
-                Box {
-                    BackHandler {
-                        showPostView = false
-                    }
-                    PostView(
-                        dataSourceFactory = viewModel.dataSourceFactory,
-                        posts = postList,
-                        messages = postMessages,
-                        startIndex = 0,
-                        messageId = messageClicked,
-                        onGoToNextPage = {},
-                        onGoToPrevPage = {},
-                        onJoinPost = { postId, time ->
-
-                        },
-                        onPreloadNextPost = { contentUrl, postType ->
-
-                        },
-                        onSendMessage = { messageContent, postId, repliedTo ->
-
-                        },
-                        onGoBack = {
-                            showPostView = false
-                        },
-                    )
-                }
             }
         }
     } else {
@@ -428,6 +395,39 @@ fun ReplyLogMessageItem(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TopBar(
+    modifier: Modifier = Modifier,
+    onThreeDotClicked: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .padding(start = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Replies",
+            style = Typography.headlineSmall.copy(color = White1),
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            onClick = onThreeDotClicked,
+            shape = RectangleShape,
+            modifier = Modifier.wrapContentSize()
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.more_vert),
+                contentDescription = "Replies menu",
+                tint = White1,
+                modifier = Modifier
+                    .height(24.dp)
+            )
         }
     }
 }

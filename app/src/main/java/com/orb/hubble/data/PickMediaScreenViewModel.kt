@@ -16,8 +16,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
 
 @HiltViewModel
-class PostScreenViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+class PickMediaScreenViewModel @Inject constructor(
+    @param: ApplicationContext private val context: Context
 ): ViewModel() {
 
     private val _selectedFolder = MutableStateFlow<String?>(null)

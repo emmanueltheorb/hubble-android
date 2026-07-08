@@ -92,7 +92,8 @@ data class Message @OptIn(ExperimentalTime::class) constructor(
     val repliedMessage: Message? = null,
     @Serializable(with = InstantSerializer::class)
     val insertedAt: Instant,
-    val user: User
+    val user: User,
+    val pending: Boolean = true
 ) {
     constructor(
         id: String,
@@ -101,8 +102,9 @@ data class Message @OptIn(ExperimentalTime::class) constructor(
         repliedTo: String?,
         repliedUserId: String?,
         insertedAt: Instant,
-        user: User
-    ) : this(id, content, postId, repliedTo, repliedUserId, null, insertedAt, user)
+        user: User,
+        pending: Boolean
+    ) : this(id, content, postId, repliedTo, repliedUserId, null, insertedAt, user, pending)
 }
 
 data class MessageWithReply(
@@ -175,6 +177,7 @@ data class CreatePostRequest(
 
 @Serializable
 data class PostMessageRequest(
+    @SerialName("message_id") val messageId: String,
     @SerialName("user_id") val userId: String,
     @SerialName("post_id") val postId: String,
     val content: String,

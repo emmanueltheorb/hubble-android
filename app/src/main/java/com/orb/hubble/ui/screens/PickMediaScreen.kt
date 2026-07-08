@@ -1,17 +1,11 @@
 package com.orb.hubble.ui.screens
 
 import android.Manifest
-import android.content.ContentUris
-import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
-import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,20 +19,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,7 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -58,27 +49,21 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
-import coil3.video.VideoFrameDecoder
-import coil3.video.videoFrameMillis
 import com.orb.hubble.R
-import com.orb.hubble.data.PostScreenViewModel
+import com.orb.hubble.data.PickMediaScreenViewModel
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black3
 import com.orb.hubble.ui.theme.Grey2
-import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
-fun PostScreen(
+fun PickMediaScreen(
     modifier: Modifier = Modifier,
-    viewModel: PostScreenViewModel = hiltViewModel(),
+    viewModel: PickMediaScreenViewModel = hiltViewModel(),
     postType: String = "Media",
     onMediaSelected: (String) -> Unit,
     onNavigate: () -> Unit
@@ -88,11 +73,6 @@ fun PostScreen(
     var goBack by remember { mutableStateOf(false) }
 
     val pagingItems = viewModel.mediaPager.collectAsLazyPagingItems()
-
-    val bottomPadding =
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
-    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
-    val screenHeight = LocalWindowInfo.current.containerSize.height.dp
 
     // System Image Picker Launcher
     val pickVisualMedia = rememberLauncherForActivityResult(
@@ -131,9 +111,9 @@ fun PostScreen(
         if (postType == "Media") {
             Box(
                 modifier = Modifier
-                    .background(Black1)
-                    .padding(top = topPadding.dp)
-                    .padding(bottom = bottomPadding.dp),
+                    .fillMaxSize()
+                    .background(Black3)
+                    .systemBarsPadding(),
                 contentAlignment = Alignment.BottomEnd
             ) {
                 MediaGrid(
