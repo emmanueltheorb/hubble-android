@@ -195,7 +195,7 @@ internal constructor(
     /**
      * Orientation that changes based on the user swipe direction
      */
-    val orientationState = mutableStateOf(Orientation.Vertical)
+    val orientationState = mutableStateOf(Orientation.Horizontal)
 
     /**
      * The ScrollableController instance. We keep it as we need to call stopAnimation on it once we

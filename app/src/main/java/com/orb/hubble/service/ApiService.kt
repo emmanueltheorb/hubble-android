@@ -2,6 +2,7 @@ package com.orb.hubble.service
 
 import android.util.Log
 import com.orb.hubble.data.PostState
+import com.orb.hubble.ui.components.compresser.ImageCompressor
 import com.orb.hubble.utils.FileReader
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -21,13 +22,15 @@ import java.io.File
 
 class ApiService(
     private val httpClient: HttpClient = MyHttpClient.client,
-    private val fileReader: FileReader
+    private val fileReader: FileReader,
+    private val imageCompressor: ImageCompressor
 ) {
 
-    fun createMediaPost(filePath: String, fileName: String, postState: PostState): Flow<ProgressUpdate> = channelFlow {
+    fun createMediaPost(filePath: String, fileName: String, postState: PostState, isVideo: Boolean): Flow<ProgressUpdate> = channelFlow {
         val info = fileReader.uriToFileInfo(filePath, fileName)
         val file = File(filePath)
         val fileLength = file.length()
+        val thumbnailString = imageCompressor.generateBase64Thumbnail(filePath = filePath, isVideo = isVideo)
 
         httpClient.submitFormWithBinaryData(
             url = "https://roma-hexaplaric-trilaterally.ngrok-free.dev/api/upload",
@@ -39,6 +42,7 @@ class ApiService(
                 append("content_url", postState.contentUrl)
                 append("thumbnail_url", postState.thumbnailUrl)
                 append("thumbnail_at", postState.thumbnailAt)
+                append("thumbnail_string", thumbnailString ?: "")
                 append("type", postState.type)
                 postState.tags.forEach { tag ->
                     append("tags[]", tag)

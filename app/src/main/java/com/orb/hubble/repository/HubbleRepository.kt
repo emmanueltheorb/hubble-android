@@ -183,8 +183,8 @@ class HubbleRepository @Inject constructor(
 //        websocketService.sendEvent(ClientEvent.CreatePost(post, pageId))
 //    }
 
-    fun createPost(filePath: String, fileName: String, postState: PostState): Flow<ProgressUpdate> {
-        return apiService.createMediaPost(filePath, fileName, postState)
+    fun createPost(filePath: String, fileName: String, postState: PostState, isVideo: Boolean): Flow<ProgressUpdate> {
+        return apiService.createMediaPost(filePath, fileName, postState, isVideo)
     }
 
     fun createTextPost(postState: PostState): Flow<ProgressUpdate> {

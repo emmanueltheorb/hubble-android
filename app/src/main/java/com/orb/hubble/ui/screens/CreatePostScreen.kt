@@ -4,11 +4,14 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,6 +75,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.ContentFrame
 import com.orb.hubble.data.CreatePostScreenViewModel
 import com.orb.hubble.ui.components.DraggableContainer
+import com.orb.hubble.ui.components.MyRangeSlider
 import com.orb.hubble.ui.components.OverlayStickers
 import com.orb.hubble.ui.components.OverlayTextConfig
 import com.orb.hubble.ui.components.OverlayTextField
@@ -79,8 +83,10 @@ import com.orb.hubble.ui.components.TextColorPicker
 import com.orb.hubble.ui.components.getVideoDuration
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Typography
+import kotlinx.coroutines.delay
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,10 +114,26 @@ fun CreatePostScreen(
     }
 
     val thumbnails by viewModel.thumbnails.collectAsState()
+    val thumbnailCount = 9
+
+    var sliderPosition by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+
+    val currentPosition = remember { mutableLongStateOf(0L) }
+    val centerInteractionSource = remember { MutableInteractionSource() }
 
     var videoDurationMs by remember { mutableLongStateOf(0L) }
     var startTime by remember { mutableFloatStateOf(0f) }
     var endTime by remember { mutableFloatStateOf(90f) }
+
+    val animatedPosition by animateFloatAsState(
+        targetValue = if (isDragging) sliderPosition else startTime + (currentPosition.longValue / 1000f),
+        animationSpec = if (isDragging) snap() else tween(
+            durationMillis = 200,
+            easing = LinearEasing
+        ),
+        label = "SliderSmoothing"
+    )
 
     val maxVideoDurationSec = (videoDurationMs / 1000f).coerceAtLeast(1f)
 
@@ -126,6 +148,12 @@ fun CreatePostScreen(
 
     LaunchedEffect(screenSize) {
         viewModel.updateScreenSize(screenSize)
+    }
+
+    LaunchedEffect(currentPosition) {
+        if (!isDragging) {
+            sliderPosition = currentPosition.longValue.toFloat()
+        }
     }
 
     LaunchedEffect(uri) {
@@ -189,23 +217,39 @@ fun CreatePostScreen(
                     Row(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        thumbnails.forEach { bitmap ->
-                            AnimatedVisibility(
-                                visible = true,
-                                enter = fadeIn()
+                        for (i in 0 until thumbnailCount) {
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
                             ) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = null,
+                                val bitmap = thumbnails.getOrNull(i)
+
+                                AnimatedVisibility(
+                                    visible = bitmap != null,
+                                    enter = fadeIn(),
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    contentScale = ContentScale.Crop
-                                )
+                                        .fillMaxSize()
+                                ) {
+                                    if (bitmap != null) {
+                                        Image(
+                                            bitmap = bitmap.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
-                    RangeSlider(
+                    MyRangeSlider(
+                        currentValue = animatedPosition,
+                        onCurrentValueChange = {
+                            isDragging = true
+                            sliderPosition = it
+                        },
                         value = startTime..endTime,
                         modifier = Modifier.fillMaxSize(),
                         onValueChange = { range ->
@@ -228,13 +272,43 @@ fun CreatePostScreen(
                                 }
                             }
                         },
-                        valueRange = 0f..1f.coerceAtLeast(maxVideoDurationSec),
+                        valueRange = 0f..maxVideoDurationSec,
                         steps = 0,
                         colors = SliderDefaults.colors(
                             activeTrackColor = Color.Transparent,
                             inactiveTrackColor = Color.Black.copy(alpha = 0.5f)
                         )
                     )
+//                    RangeSlider(
+//                        value = startTime..endTime,
+//                        modifier = Modifier.fillMaxSize(),
+//                        onValueChange = { range ->
+//                            val newStart = range.start.coerceIn(0f, maxVideoDurationSec)
+//                            val newEnd = range.endInclusive.coerceIn(0f, maxVideoDurationSec)
+//
+//                            if (newEnd >= newStart) {
+//                                val difference = newEnd - newStart
+//                                if (difference > 90) {
+//                                    if (range.start != startTime) {
+//                                        startTime = newStart
+//                                        endTime = (newStart + 90).coerceAtMost(maxVideoDurationSec)
+//                                    } else {
+//                                        endTime = newEnd
+//                                        startTime = (newEnd - 90).coerceAtLeast(0f)
+//                                    }
+//                                } else {
+//                                    startTime = newStart
+//                                    endTime = newEnd
+//                                }
+//                            }
+//                        },
+//                        valueRange = 0f..maxVideoDurationSec,
+//                        steps = 0,
+//                        colors = SliderDefaults.colors(
+//                            activeTrackColor = Color.Transparent,
+//                            inactiveTrackColor = Color.Black.copy(alpha = 0.5f)
+//                        )
+//                    )
                 }
             }
             Box {
@@ -243,7 +317,10 @@ fun CreatePostScreen(
                         modifier = videoSizeGetModifier,
                         uri = uri,
                         startTimeMs = (startTime * 1000).toLong(),
-                        endTimeMs = (endTime * 1000).toLong()
+                        endTimeMs = (endTime * 1000).toLong(),
+                        onCurrentPositionChange = { long ->
+                            currentPosition.longValue = long
+                        }
                     )
                 } else {
                     AsyncImage(
@@ -479,7 +556,8 @@ fun VideoEditorPlayer(
     modifier: Modifier,
     uri: Uri,
     startTimeMs: Long,
-    endTimeMs: Long
+    endTimeMs: Long,
+    onCurrentPositionChange: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val exoPlayer = remember(uri) {
@@ -502,6 +580,13 @@ fun VideoEditorPlayer(
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            onCurrentPositionChange(exoPlayer.currentPosition)
+            delay(400.milliseconds)
+        }
     }
 
     DisposableEffect(Unit) {

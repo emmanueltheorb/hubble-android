@@ -39,11 +39,12 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.orb.hubble.data.FlowViewModel
 import com.orb.hubble.ui.components.CrossLayout
+import com.orb.hubble.ui.components.RangeSliderTestScreen
 import com.orb.hubble.ui.components.TwoDimensionalLazyLayout
 import com.orb.hubble.ui.components.compresser.BlurredImagePost
 import com.orb.hubble.ui.components.compresser.FileManager
-import com.orb.hubble.ui.components.compresser.ImageCompressTestScreen
 import com.orb.hubble.ui.components.compresser.ImageCompressor
+import com.orb.hubble.ui.components.compresser.ThumbnailUtils
 import com.orb.hubble.ui.components.crossPager.SampleCrossPagerUse
 import com.orb.hubble.ui.components.crossPager.ScrollTestColumn
 import com.orb.hubble.ui.components.getStickerByPrefix
@@ -76,18 +77,13 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             HubbleTheme {
-                //MyNavigationHost()
-                BlurredImagePost()
+                MyNavigationHost()
+//                BlurredImagePost(
+//                    thumbnailUtils = ThumbnailUtils(applicationContext)
+//                )
                 //SampleCrossPagerUse()
                 //ScrollTestColumn()
-//                ImageCompressTestScreen(
-//                    imageCompressor = remember {
-//                        ImageCompressor(applicationContext)
-//                    },
-//                    fileManager = remember {
-//                        FileManager(applicationContext)
-//                    }
-//                )
+                //RangeSliderTestScreen()
             }
         }
     }

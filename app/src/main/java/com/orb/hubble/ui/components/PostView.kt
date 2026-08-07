@@ -92,6 +92,7 @@ import androidx.media3.datasource.DataSource
 import com.orb.hubble.R
 import com.orb.hubble.data.Message
 import com.orb.hubble.data.Post
+import com.orb.hubble.data.PostType
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black2
 import com.orb.hubble.ui.theme.Black3
@@ -197,9 +198,10 @@ fun PostView(
             //.padding(top = topPadding.dp)
     ) {
         val currentPost = posts[currentIndex]
-        if (currentPost.type.equals("Video", ignoreCase = true)) {
+        if (currentPost.type.equals(PostType.VIDEO.name, ignoreCase = true)) {
             VideoPlayer(
                 videoUrl = currentPost.contentUrl!!,
+                thumbnailString = currentPost.thumbnailString,
                 description = currentPost.description,
                 dataSourceFactory = dataSourceFactory,
                 paddingTop = 1.dp,
@@ -235,9 +237,10 @@ fun PostView(
                 pausePlay = messageId != null
             )
         }
-        if (currentPost.type.equals("Image", ignoreCase = true)) {
+        if (currentPost.type.equals(PostType.IMAGE.name, ignoreCase = true)) {
             ImageViewer(
                 imageUrl = currentPost.contentUrl!!,
+                thumbnailString = currentPost.thumbnailString,
                 paddingTop = 1.dp,
                 paddingBottom = 55.dp,
                 onGoLeft = {
@@ -264,7 +267,7 @@ fun PostView(
                 }
             )
         }
-        if (currentPost.type.equals("Text", ignoreCase = true)) {
+        if (currentPost.type.equals(PostType.TEXT.name, ignoreCase = true)) {
             TextPostViewer(
                 contentText = currentPost.contentText!!,
                 backgroundColor = Color.Cyan.copy(alpha = 0.8f),

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.orb.hubble.R
+import com.orb.hubble.data.PostIsFrom
 import kotlinx.serialization.Serializable
 
 sealed class SubGraph {
@@ -28,7 +29,8 @@ sealed class Dest {
     data class ViewStatusScreen(
         val pageId: String? = null,
         val messageId: String? = null,
-        val postId: String? = null
+        val postId: String? = null,
+        val isFrom: PostIsFrom = PostIsFrom.NOWHERE
     ): Dest()
 
     @Serializable

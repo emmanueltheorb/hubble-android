@@ -25,6 +25,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+enum class PostType {
+    IMAGE,
+    VIDEO,
+    TEXT
+}
+
 @Entity(
     tableName = "post",
     indices = [Index("pageId")]
@@ -39,6 +45,7 @@ data class Post @OptIn(ExperimentalTime::class) constructor(
     val contentText: String? = null,
     val backgroundColor: String? = null,
     val thumbnailAt: String?,
+    val thumbnailString: String? = null,
     val type: String,
     val tags: List<String>?,
     @Serializable(with = InstantSerializer::class)
@@ -133,6 +140,13 @@ data class MessageWithPostAndReply(
     val postSummary: Post
 )
 
+data class MessageLog(
+    val message: Message,
+    val repliedMessage: Message?,
+    val postSummary: Post,
+    val threadLink: ThreadLink
+)
+
 data class PostSummary(
     val id: String,
     val type: String,
@@ -140,6 +154,13 @@ data class PostSummary(
     val contentText: String?,
     val backgroundColor: String?
 )
+
+enum class ThreadLink {
+    BOTTOM, // Start of thread: line goes from post thumbnail bottom downwards
+    FULL,   // Middle of thread: line goes through top-to-bottom
+    TOP,    // End of thread: line comes from top down to message center or bottom, still undecided
+    NONE    // Message not in a thread
+}
 
 @Entity(
     tableName = "media_cache_entries",

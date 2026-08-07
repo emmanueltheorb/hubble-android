@@ -1,6 +1,7 @@
 package com.orb.hubble.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +24,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -115,6 +119,15 @@ fun StatusView(
     inactiveColor: Color = Color(0xB9606073), // Gray for inactive segments
     interactionSource: MutableInteractionSource? = null
 ) {
+    val thumbnail = remember(posts.last()) {
+        val thumbnailString = posts.last().thumbnailString
+        if (!thumbnailString.isNullOrEmpty()) {
+            decodeBase64Thumbnail(thumbnailString)
+        } else {
+            null
+        }
+    }
+
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -150,24 +163,38 @@ fun StatusView(
                 .clip(CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(posts.last().thumbnailUrl)
-                    .size(with(LocalDensity.current) { innerCircleSize.roundToPx() })
-                    .crossfade(true)
-                    .error(R.drawable.thumbnail_load_error)
-                    .build(),
-                contentDescription = "Selected image",
+//            AsyncImage(
+//                model = ImageRequest.Builder(LocalContext.current)
+//                    .data(posts.last().thumbnailUrl)
+//                    .size(with(LocalDensity.current) { innerCircleSize.roundToPx() })
+//                    .crossfade(true)
+//                    .error(R.drawable.thumbnail_load_error)
+//                    .build(),
+//                contentDescription = "Selected image",
+//                modifier = Modifier
+//                    .fillMaxSize()
+//                    .clickable(
+//                        interactionSource = interactionSource,
+//                        indication = ripple(bounded = false, radius = innerCircleSize / 2),
+//                        onClick = {}
+//                    ),
+//                contentScale = ContentScale.Crop
+//            )
+
+
+            Image(
+                bitmap = thumbnail!!.asImageBitmap(),
+                contentDescription = "user last post thumbnail",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
+                    .blur(0.1.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = ripple(bounded = false, radius = innerCircleSize / 2),
                         onClick = {}
-                    ),
-                contentScale = ContentScale.Crop
+                    )
             )
-
         }
     }
 }

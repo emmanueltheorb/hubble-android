@@ -60,6 +60,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import com.orb.hubble.data.HomeScreenViewModel
+import com.orb.hubble.data.PostIsFrom
 import com.orb.hubble.ui.screens.CreatePostScreen
 import com.orb.hubble.ui.screens.ExploreScreen
 import com.orb.hubble.ui.screens.HomeScreen
@@ -124,12 +125,12 @@ fun MyNavigationHost(
             enterTransition = {
                 scaleIn(
                     initialScale = .9f
-                )
+                ) + fadeIn()
             },
             exitTransition = {
                 scaleOut(
-                    targetScale = .9f
-                )
+                    targetScale = 1.1f
+                ) + fadeOut()
             },
             popEnterTransition = {
                 scaleIn(initialScale = .9f) + fadeIn()
@@ -179,8 +180,13 @@ fun BottomNavGraph(
                 0 -> ExploreScreen()
                 1 -> HomeScreen(
                     userId = "3",
-                    navToViewStatusScreen = { pageId ->
-                        navController.navigate(Dest.ViewStatusScreen(pageId = pageId))
+                    navToViewStatusScreen = { pageId, postIsFrom ->
+                        navController.navigate(
+                            Dest.ViewStatusScreen(
+                                pageId = pageId,
+                                isFrom = postIsFrom
+                            )
+                        )
                     },
                     navToAddPostScreen = {
                         navController.navigate(Dest.PickMediaScreen)
@@ -195,7 +201,8 @@ fun BottomNavGraph(
                         navController.navigate(
                             Dest.ViewStatusScreen(
                                 postId = postId,
-                                messageId = messageId
+                                messageId = messageId,
+                                isFrom = PostIsFrom.SINGLE_POST
                             )
                         )
                     }

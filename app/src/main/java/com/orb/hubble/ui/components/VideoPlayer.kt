@@ -38,8 +38,11 @@ import androidx.compose.runtime.retain.retain
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -57,9 +61,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import coil3.compose.AsyncImage
 import com.orb.hubble.R
 import com.orb.hubble.ui.theme.Grey2
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -67,7 +73,8 @@ fun VideoPlayer(
     paddingTop: Dp = 1.dp,
     paddingBottom: Dp = 0.dp,
     videoUrl: String,
-    description: String? = "Wahala be like i phone",
+    thumbnailString: String?,
+    description: String?,
     onGoLeft: () -> Unit,
     onGoRight: () -> Unit,
     onCenterTapped: () -> Unit,
@@ -75,6 +82,14 @@ fun VideoPlayer(
     dataSourceFactory: DataSource.Factory
 ) {
     val context = LocalContext.current
+
+    val blurThumbnail = remember(thumbnailString) {
+        if (!thumbnailString.isNullOrEmpty()) {
+            decodeBase64Thumbnail(thumbnailString)
+        } else {
+            null
+        }
+    }
 
     val currentPosition = remember { mutableLongStateOf(0L) }
     var isBuffering by remember { mutableStateOf(true) }
@@ -101,7 +116,7 @@ fun VideoPlayer(
     LaunchedEffect(exoPlayer) {
         while (true) {
             currentPosition.longValue = exoPlayer.currentPosition
-            delay(400)
+            delay(400.milliseconds)
         }
     }
 
@@ -113,6 +128,12 @@ fun VideoPlayer(
                 } else if (playbackState == Player.STATE_READY) {
                     isBuffering = false
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                super.onPlayerError(error)
+                //exoPlayer.prepare()
+                isBuffering = true
             }
         }
         exoPlayer.addListener(listener)
@@ -132,7 +153,7 @@ fun VideoPlayer(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = { offset ->
                         val centerWidthPercent = 0.3f
@@ -163,7 +184,36 @@ fun VideoPlayer(
             ContentFrame(
                 player = exoPlayer,
                 surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
-                contentScale = ContentScale.Fit
+                contentScale = ContentScale.Fit,
+                shutter = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black)
+                    ) {
+                        Column {
+                            Image(
+                                bitmap = blurThumbnail!!.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .blur(15.dp),
+                            )
+                        }
+                    }
+//                    AsyncImage(
+//                        model = blurThumbnail,
+//                        contentDescription = "an image post",
+//                        contentScale = ContentScale.Fit,
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .blur(15.dp)
+//                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
             )
 
             if (isBuffering) {
@@ -178,7 +228,7 @@ fun VideoPlayer(
                 modifier = Modifier.align(Alignment.BottomCenter),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                if (description != null && description.isNotEmpty()) {
+                if (!description.isNullOrEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -191,12 +241,12 @@ fun VideoPlayer(
 //                        BoxWithConstraints {
 //                            val width = constraints.maxWidth
 //                            DescriptionText(
-//                                text = "So as i stared inot the lonely abyss that marked the \uD83E\uDD70",
+//                                text = "So as i stared into the lonely abyss that marked the \uD83E\uDD70",
 //                                containerWidth = width
 //                            )
 //                        }
                         Text(
-                            text = "So as i stared inot the lonely abyss that marked the \uD83E\uDD70", //formerly description
+                            text = description, //formerly "So as i stared into the lonely abyss that marked the \uD83E\uDD70"
                             textAlign = TextAlign.Center,
                             color = Color.White,
                             fontWeight = FontWeight.Medium

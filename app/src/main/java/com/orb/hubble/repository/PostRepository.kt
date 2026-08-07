@@ -35,19 +35,29 @@ class PostRepository @Inject constructor(
     private val _selectedTab = MutableStateFlow(PostFilterTab.ALL)
     val selectedTab = _selectedTab.asStateFlow()
 
-    val postsFromDb = repository.getAllPosts()
+    private val postsFromDb = repository.getAllPosts()
         .stateIn(
             externalScope,
             SharingStarted.WhileSubscribed(5000),
             emptyList()
         )
 
-    val myPosts: StateFlow<List<Post>> =
+    val myPosts: StateFlow<Status?> =
         combine(postsFromDb, _homeScreenDeps) { posts, deps ->
+            val postList = posts.groupBy { it.pageId }[deps.pageId] ?: emptyList()
 
-            posts.groupBy { it.pageId }[deps.pageId] ?: emptyList()
-
-        }.stateIn(externalScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            if (postList.isNotEmpty()) {
+                Status(
+                    pageId = deps.pageId,
+                    ownerId = deps.userId,
+                    username = postList.last().page.name,
+                    profilePic = "",
+                    posts = postList
+                )
+            } else {
+                null
+            }
+        }.stateIn(externalScope, SharingStarted.WhileSubscribed(5000), null)
 
     val homeScreenPostState: StateFlow<HomeScreenPostState> =
         combine(postsFromDb, _homeScreenDeps, _selectedTab) { posts, deps, tab ->
@@ -99,7 +109,7 @@ class PostRepository @Inject constructor(
         _selectedTab.value = tab
     }
 
-    fun setHomeScreenDeps() {
+    private fun setHomeScreenDeps() {
         userRepository.followedPages
             .onEach { followedPages ->
                 if (followedPages.isNotEmpty()) {

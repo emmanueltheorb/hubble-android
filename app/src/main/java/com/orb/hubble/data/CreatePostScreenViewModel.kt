@@ -84,9 +84,9 @@ class CreatePostScreenViewModel @Inject constructor(
     private val _isLoadingThumbnails = MutableStateFlow(false)
     val isLoadingThumbnails = _isLoadingThumbnails.asStateFlow()
 
-    fun createMediaPost(filePath: String, fileName: String, postState: PostState) {
+    fun createMediaPost(filePath: String, fileName: String, postState: PostState, isVideo: Boolean) {
         uploadJob = repository
-            .createPost(filePath, fileName, postState)
+            .createPost(filePath, fileName, postState, isVideo)
             .onStart {
                 _state.update {
                     it.copy(
@@ -496,7 +496,8 @@ class CreatePostScreenViewModel @Inject constructor(
                     createMediaPost(
                         filePath = cachedFile.absolutePath,
                         fileName = fileName,
-                        postState = _postState.value.copy(type = "video")
+                        postState = _postState.value.copy(type = PostType.VIDEO.name),
+                        isVideo = true
                         )
 
                 } else {
@@ -516,7 +517,8 @@ class CreatePostScreenViewModel @Inject constructor(
                                 createMediaPost(
                                     filePath = path,
                                     fileName = fileName,
-                                    postState = _postState.value.copy(type = "video")
+                                    postState = _postState.value.copy(type = PostType.VIDEO.name),
+                                    isVideo = true
                                 )
                                 //shareSheet.shareFile(path)
                             }
@@ -540,7 +542,8 @@ class CreatePostScreenViewModel @Inject constructor(
                                 createMediaPost(
                                     filePath = it,
                                     fileName = fileName,
-                                    postState = _postState.value.copy(type = "image")
+                                    postState = _postState.value.copy(type = PostType.IMAGE.name),
+                                    isVideo = false
                                 )
                                 //shareSheet.shareFile(it)
                             }
@@ -549,7 +552,7 @@ class CreatePostScreenViewModel @Inject constructor(
                             }
                     } else {
                         createTextPost(
-                            postState = _postState.value.copy(type = "text")
+                            postState = _postState.value.copy(type = PostType.TEXT.name)
                         )
                         //call createTextPost here
                     }

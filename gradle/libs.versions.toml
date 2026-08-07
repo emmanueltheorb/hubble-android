@@ -16,7 +16,7 @@ activityCompose = "1.13.0"
 composeBom = "2026.03.01"
 lifecycleViewmodelKtx = "2.10.0"
 materialIconsCore = "1.7.3"
-media3 = "1.10.0"
+media3 = "1.10.1"
 navigationCompose = "2.9.7"
 kotlinxCoroutinesAndroid = "1.9.0"
 kotlinxSerializationJson = "1.10.0"
@@ -39,6 +39,8 @@ androidx-media3-effect = { group = "androidx.media3", name = "media3-effect", ve
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
 androidx-media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "media3" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-inspector = { group = "androidx.media3", name = "media3-inspector", version.ref = "media3" }
+androidx-media3-inspector-frame = { group = "androidx.media3", name = "media3-inspector-frame", version.ref = "media3" }
 androidx-media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomKtx" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx" }
@@ -93,7 +95,9 @@ media3 = [
     "androidx-media3-common",
     "androidx-media3-ui-compose",
     "androidx-media3-exoplayer",
-    "androidx-media3-datasource-okhttp"
+    "androidx-media3-datasource-okhttp",
+    "androidx-media3-inspector",
+    "androidx-media3-inspector-frame"
 ]
 ktor = [
     "ktor-client-core",

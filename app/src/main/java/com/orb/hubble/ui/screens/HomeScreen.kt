@@ -53,6 +53,7 @@ import com.orb.hubble.R
 import com.orb.hubble.data.HomeScreenViewModel
 import com.orb.hubble.data.Post
 import com.orb.hubble.data.PostFilterTab
+import com.orb.hubble.data.PostIsFrom
 import com.orb.hubble.data.User
 import com.orb.hubble.repository.HomeScreenPostState
 //import com.orb.hubble.data.postsList10
@@ -81,7 +82,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     userId: String = "3",
     viewModel: HomeScreenViewModel = hiltViewModel(),
-    navToViewStatusScreen: (String) -> Unit,
+    navToViewStatusScreen: (String, PostIsFrom) -> Unit,
     navToAddPostScreen: () -> Unit,
     navToReplyLogScreenTemporary: () -> Unit
 ) {
@@ -95,9 +96,9 @@ fun HomeScreen(
         pageCount = { PostFilterTab.entries.size }
     )
 
-    val bottomPadding =
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
-    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
+//    val bottomPadding =
+//        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
+//    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value.toInt()
 
 //    LaunchedEffect(userId) {
 //        viewModel.connect(userId)
@@ -138,7 +139,7 @@ fun HomeScreen(
                 )
             }
             item {
-                if (myStatus.isEmpty()) {
+                if (myStatus == null) {
                     MyStatus(
                         user = User(
                             id = "",
@@ -148,15 +149,15 @@ fun HomeScreen(
                         ),
                         onAddPostClicked = {},
                         onViewStatusClicked = { pageId ->
-                            navToViewStatusScreen(pageId)
+                            navToViewStatusScreen(pageId, PostIsFrom.MY_POSTS)
                         },
                     )
                 } else {
                     StatusItem(
-                        posts = myStatus,
-                        username = myStatus.first().page.name,
+                        posts = myStatus?.posts ?: emptyList(),
+                        username = myStatus?.username ?: "",
                         onStatusClicked = { pageId ->
-                            navToViewStatusScreen(pageId)
+                            navToViewStatusScreen(pageId, PostIsFrom.MY_POSTS)
                         }
                     )
                 }
@@ -193,13 +194,12 @@ fun HomeScreen(
                     state = pagerState,
                     postsState = postsState,
                     navToViewStatusScreen = { pageId ->
-                        navToViewStatusScreen(pageId)
+                        navToViewStatusScreen(pageId, PostIsFrom.HOME_SCREEN)
                     }
                 )
             }
         }
         TopBar(
-            topPadding = topPadding,
             onSearchClicked = navToAddPostScreen,
             onThreeDotClicked = navToReplyLogScreenTemporary
         )
@@ -290,7 +290,6 @@ fun MyStatus(
 @Composable
 private fun TopBar(
     modifier: Modifier = Modifier,
-    topPadding: Int,
     onSearchClicked: () -> Unit,
     onThreeDotClicked: () -> Unit
 ) {
@@ -401,7 +400,7 @@ fun SelectableText(
 }
 
 @Composable
-fun Posts(
+private fun Posts(
     modifier: Modifier = Modifier,
     state: PagerState,
     postsState: HomeScreenPostState,

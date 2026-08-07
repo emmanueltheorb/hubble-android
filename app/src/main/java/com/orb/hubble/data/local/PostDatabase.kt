@@ -1,5 +1,6 @@
 package com.orb.hubble.data.local
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
@@ -14,7 +15,7 @@ import com.orb.hubble.data.User
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
-@Database(entities = [Post::class, Message::class, CacheEntry::class], version = 10)
+@Database(entities = [Post::class, Message::class, CacheEntry::class], version = 11, autoMigrations = [AutoMigration(from = 10, to = 11)])
 @TypeConverters(Converters::class)
 abstract class PostDatabase : RoomDatabase() {
 

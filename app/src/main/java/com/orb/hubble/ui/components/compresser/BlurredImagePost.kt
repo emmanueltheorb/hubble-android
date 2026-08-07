@@ -34,7 +34,8 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun BlurredImagePost(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    thumbnailUtils: ThumbnailUtils
 ) {
     val placeholderBitmap: MutableState<Bitmap?> = remember { mutableStateOf(null) }
 
@@ -48,18 +49,24 @@ fun BlurredImagePost(
             return@rememberLauncherForActivityResult
         }
 
-        val inputBytes = context
-            .contentResolver
-            .openInputStream(contentUri)
-            ?.use { inputStream ->
-                inputStream.readBytes()
-            } ?: return@rememberLauncherForActivityResult
+        val mimeType = context.contentResolver.getType(contentUri)
+        val isVideo = mimeType?.startsWith("video") == true
 
-        val bitmap = BitmapFactory.decodeByteArray(inputBytes, 0, inputBytes.size)
+//        val inputBytes = context
+//            .contentResolver
+//            .openInputStream(contentUri)
+//            ?.use { inputStream ->
+//                inputStream.readBytes()
+//            } ?: return@rememberLauncherForActivityResult
 
-        val bitmapString = ThumbnailUtils.generateBase64Thumbnail(sourcedBitmap = bitmap)
+        //val bitmap = BitmapFactory.decodeByteArray(inputBytes, 0, inputBytes.size)
 
-        placeholderBitmap.value = ThumbnailUtils.decodeBase64Thumbnail(bitmapString)
+        val bitmapString = thumbnailUtils.generateBase64Thumbnail(
+            contentUri = contentUri,
+            isVideo = isVideo
+        )
+
+        placeholderBitmap.value = thumbnailUtils.decodeBase64Thumbnail(bitmapString)
     }
 
     Column {
@@ -70,7 +77,7 @@ fun BlurredImagePost(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .blur(16.dp),
+                        .blur(15.dp),//5
                     contentScale = ContentScale.FillWidth
                 )
             }
@@ -87,7 +94,7 @@ fun BlurredImagePost(
             onClick = {
                 photoPicker.launch(
                     PickVisualMediaRequest(
-                        mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly
+                        mediaType = ActivityResultContracts.PickVisualMedia.ImageAndVideo
                     )
                 )
             }

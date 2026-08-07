@@ -3,6 +3,7 @@ package com.orb.hubble.ui.screens
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -33,6 +35,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -55,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -82,20 +88,29 @@ import coil3.request.crossfade
 import coil3.size.Precision
 import com.orb.hubble.R
 import com.orb.hubble.data.Message
+import com.orb.hubble.data.MessageLog
 import com.orb.hubble.data.MessageWithPostAndReply
+import com.orb.hubble.data.PostFilterTab
+import com.orb.hubble.data.RepliesFilterTab
 import com.orb.hubble.data.ReplyLogViewModel
+import com.orb.hubble.data.ThreadLink
+import com.orb.hubble.repository.RepliesScreenMessagesState
 import com.orb.hubble.ui.components.DragState
 import com.orb.hubble.ui.components.InputField
 import com.orb.hubble.ui.components.MessageInput
 import com.orb.hubble.ui.components.PostView
+import com.orb.hubble.ui.components.StatusItem
 import com.orb.hubble.ui.components.toColor
 import com.orb.hubble.ui.theme.Black1
 import com.orb.hubble.ui.theme.Black3
+import com.orb.hubble.ui.theme.Black4
 import com.orb.hubble.ui.theme.Grey2
+import com.orb.hubble.ui.theme.Grey3
 import com.orb.hubble.ui.theme.NunitoFontFamily
 import com.orb.hubble.ui.theme.Typography
 import com.orb.hubble.ui.theme.White1
 import com.orb.hubble.ui.theme.White3
+import com.orb.hubble.ui.utils.withHash
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -112,11 +127,18 @@ fun ReplyLogScreen(
 ) {
     val messageList by viewModel.messageList.collectAsState()
 
+    val messagesState by viewModel.messagesState.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+
     val isLoadingMessageList by viewModel.isLoadingMessageList.collectAsStateWithLifecycle()
     val isLoadingPosts by viewModel.isLoadingPosts.collectAsStateWithLifecycle()
     var showInputField by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = selectedTab.ordinal,
+        pageCount = { PostFilterTab.entries.size }
+    )
 
     val textInput = remember { mutableStateOf("") }
     var repliedMessage: Message? by remember { mutableStateOf(null) }
@@ -125,40 +147,33 @@ fun ReplyLogScreen(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
-    if (!isLoadingMessageList) {
-        Box(
-            modifier = modifier
-                .background(Black3)
-                .systemBarsPadding()
-        ) {
-            LazyColumn(
-                modifier = Modifier.height(900.dp),
-                verticalArrangement = Arrangement.spacedBy(25.dp)
-            ) {
-                item {
-                    TopBar(
-                        onThreeDotClicked = {
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collectLatest {
+            viewModel.setSelectedTab(RepliesFilterTab.entries[pagerState.currentPage])
+        }
+    }
 
-                        }
-                    )
+    Box(
+        modifier = modifier
+            .background(Black3)
+            .statusBarsPadding()
+    ) {
+        if (!isLoadingMessageList) {
+            Messages(
+                pagerState = pagerState,
+                repliesState = messagesState,
+                onMessageClicked = { message ->
+                    onMessageClicked(message.postId, message.id)
+                },
+                onMessageDragged = { message ->
+                    showInputField = true
+                    controller?.show()
+                    repliedMessage = message
+                    focusRequester.freeFocus()
+                    focusManager.clearFocus()
+                    focusRequester.requestFocus()
                 }
-                items(messageList) { message ->
-                    ReplyLogMessageItem(
-                        message = message,
-                        onMessageClicked = { message ->
-                            onMessageClicked(message.postId, message.id)
-                        },
-                        onMessageDragged = { message ->
-                            showInputField = true
-                            controller?.show()
-                            repliedMessage = message
-                            focusRequester.freeFocus()
-                            focusManager.clearFocus()
-                            focusRequester.requestFocus()
-                        }
-                    )
-                }
-            }
+            )
 
             if (showInputField) {
                 MessageInput(
@@ -184,23 +199,39 @@ fun ReplyLogScreen(
                     focusRequester = focusRequester
                 )
             }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
         }
-    } else {
-        Box(
+        TopBar(
+            onThreeDotClicked = {
+
+            }
+        )
+        BottomTabRow(
+            selectedTab = selectedTab,
+            onTabClicked = { tab ->
+                viewModel.setSelectedTab(tab)
+                scope.launch {
+                    pagerState.animateScrollToPage(tab.ordinal)
+                }
+            },
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
+                .align(Alignment.BottomCenter)
+        )
     }
 }
 
 @Composable
 fun ReplyLogMessageItem(
     modifier: Modifier = Modifier,
-    message: MessageWithPostAndReply,
+    message: MessageLog,
     onMessageClicked: (Message) -> Unit,
     onMessageDragged: (Message) -> Unit
 ) {
@@ -231,6 +262,15 @@ fun ReplyLogMessageItem(
                 }
             }
     }
+
+    val thumbnailImagesIdList = listOf<Int>(
+        R.drawable.thumb1,
+        R.drawable.thumb2,
+        R.drawable.thumb3,
+        R.drawable.thumb4,
+        R.drawable.thumb5,
+        R.drawable.thumb6,
+    )
 
     Column(
         modifier = modifier
@@ -313,17 +353,22 @@ fun ReplyLogMessageItem(
             }
             Row(
                 modifier = Modifier
-                    .padding(start = 54.dp)
+                    .fillMaxWidth()
+                    .padding(start = 54.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = annotatedString,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(end = 55.dp)//40.dp
                 )
             }
         }
         Row(
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier
+                .fillMaxWidth()
         ) {
             Surface(
                 modifier = Modifier.size(40.5.dp),
@@ -336,6 +381,7 @@ fun ReplyLogMessageItem(
             Column(
                 modifier = Modifier
                     .padding(top = 2.7.dp)
+                    .weight(1f)
                     .wrapContentHeight()
             ) {
                 Text(
@@ -353,7 +399,7 @@ fun ReplyLogMessageItem(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Spacer(Modifier.weight(1f))
+
             Box(
                 modifier = Modifier
                     .padding(top = 6.dp)
@@ -361,7 +407,9 @@ fun ReplyLogMessageItem(
             ) {
                 Surface(
                     modifier = Modifier.size(30.dp),
-                    color = if (message.postSummary.backgroundColor == null) Color(0xFF3F3F3F) else message.postSummary.backgroundColor.toColor(),
+                    color = if (message.postSummary.backgroundColor == null) Color(
+                        0xFF3F3F3F
+                    ) else message.postSummary.backgroundColor.toColor(),
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     if (message.postSummary.contentText != null) {
@@ -384,15 +432,24 @@ fun ReplyLogMessageItem(
                                 .build()
                         }
 
-                        AsyncImage(
-                            model = model,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            clipToBounds = true
-                        )
+//                        AsyncImage(
+//                            model = model,
+//                            contentDescription = null,
+//                            modifier = Modifier
+//                                .fillMaxSize(),
+//                            contentScale = ContentScale.Crop,
+//                            clipToBounds = true
+//                        )
+
                     }
+
+                    Image(
+                        painter = painterResource(thumbnailImagesIdList.withHash(message.postSummary.id)),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(30.dp),
+                        contentScale = ContentScale.Crop
+                    )
                 }
             }
         }
@@ -428,6 +485,117 @@ private fun TopBar(
                 modifier = Modifier
                     .height(24.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun BottomTabRow(
+    modifier: Modifier = Modifier,
+    selectedTab: RepliesFilterTab,
+    onTabClicked: (RepliesFilterTab) -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+//        HorizontalDivider(
+//            thickness = 1.dp,
+//            color = Black4
+//        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp)
+                .padding(vertical = 7.dp)
+                .padding(end = 22.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(15.dp)
+            ) {
+                RepliesFilterTab.entries.forEach { tab ->
+
+                    SelectableText(
+                        text = when (tab) {
+                            RepliesFilterTab.FOR_ME -> "For Me"
+                            RepliesFilterTab.MY_POSTS -> "My Posts"
+                            RepliesFilterTab.OTHER_POSTS -> "Other Posts"
+                        },
+                        isSelected = selectedTab == tab,
+                        onClick = {
+                            onTabClicked(tab)
+                        }
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(15.dp)
+            ) {
+                SelectableText(
+                    text = "Unread",
+                    isSelected = true,
+                    onClick = {
+
+                    }
+                )
+                SelectableText(
+                    text = "Seen",
+                    isSelected = false,
+                    onClick = {
+
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Messages(
+    modifier: Modifier = Modifier,
+    pagerState: PagerState,
+    repliesState: RepliesScreenMessagesState,
+    onMessageClicked: (Message) -> Unit,
+    onMessageDragged: (Message) -> Unit
+) {
+    HorizontalPager(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(900.dp),
+        beyondViewportPageCount = 0,
+        state = pagerState
+    ) { page ->
+        when (page) {
+            0 -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .height(900.dp)
+                        .padding(top = 50.dp)
+                        .padding(bottom = 35.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),//25.dp
+                ) {
+                    items(repliesState.forMeTabMessages) { message ->
+                        ReplyLogMessageItem(
+                            message = message,
+                            onMessageClicked = { message ->
+                                onMessageClicked(message)
+                            },
+                            onMessageDragged = { message ->
+                                onMessageDragged(message)
+                            }
+                        )
+                    }
+                }
+            }
+
+            1 -> {
+
+            }
+
+            2 -> {
+
+            }
         }
     }
 }

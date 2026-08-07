@@ -22,6 +22,8 @@ import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.repository.UserRepository
 import com.orb.hubble.service.ApiService
 import com.orb.hubble.service.WebsocketService
+import com.orb.hubble.ui.components.compresser.ImageCompressor
+import com.orb.hubble.ui.components.compresser.ThumbnailUtils
 import com.orb.hubble.utils.AndroidConnectivityObserver
 import com.orb.hubble.utils.ConnectivityObserver
 import com.orb.hubble.utils.FileReader
@@ -77,7 +79,6 @@ object AppModule {
     @Provides
     fun providePostDatabase(@ApplicationContext context: Context): PostDatabase =
         Room.databaseBuilder(context, PostDatabase::class.java, "post.db")
-            .fallbackToDestructiveMigration(true)
             .build()
 
     @Provides
@@ -97,13 +98,18 @@ object AppModule {
     @Provides
     @Singleton
     fun provideApiService(@ApplicationContext context: Context): ApiService =
-        ApiService(fileReader = FileReader(context))
+        ApiService(fileReader = FileReader(context), imageCompressor = ImageCompressor(context))
     
 
     @Provides
     @Singleton
     fun provideFileReader(@ApplicationContext context: Context): FileReader =
         FileReader(context = context)
+
+    @Provides
+    @Singleton
+    fun provideImageCompressor(@ApplicationContext context: Context): ImageCompressor =
+        ImageCompressor(context = context)
 
     @Provides
     @Singleton

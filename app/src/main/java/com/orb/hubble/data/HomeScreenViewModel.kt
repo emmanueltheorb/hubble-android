@@ -13,6 +13,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.orb.hubble.data.workers.SendMessageWorker
+import com.orb.hubble.repository.FakePostRepository
 import com.orb.hubble.repository.HomeScreenPostState
 import com.orb.hubble.repository.HubbleRepository
 import com.orb.hubble.repository.PostRepository
@@ -54,7 +55,7 @@ class HomeScreenViewModel @Inject constructor(
     private val connectivityObserver: ConnectivityObserver,
     private val repository: HubbleRepository,
     private val userRepository: UserRepository,
-    private val postRepository: PostRepository,
+    private val postRepository: FakePostRepository,
     private val videoCacheManager: VideoCacheManager
 ) : ViewModel() {
     val dataSourceFactory = videoCacheManager.getDataSourceFactory()
@@ -92,8 +93,8 @@ class HomeScreenViewModel @Inject constructor(
             emptyList()
         )
 
-    val myPosts: StateFlow<List<Post>> = postRepository.myPosts
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val myPosts: StateFlow<Status?> = postRepository.myPosts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val postsState: StateFlow<HomeScreenPostState> = postRepository.homeScreenPostState
         .onStart { _isLoadingPosts.value = true }

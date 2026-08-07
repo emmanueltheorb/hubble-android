@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.orb.hubble.data.local.MessageDao
+import com.orb.hubble.repository.FakeHubbleRepository
+import com.orb.hubble.repository.HomeScreenPostState
 import com.orb.hubble.repository.HubbleRepository
+import com.orb.hubble.repository.RepliesRepository
+import com.orb.hubble.repository.RepliesScreenMessagesState
 import com.orb.hubble.utils.ConnectivityObserver
 import com.orb.hubble.utils.VideoCacheManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,11 +33,15 @@ import kotlin.uuid.Uuid
 @UnstableApi
 @HiltViewModel
 class ReplyLogViewModel @Inject constructor(
-    private val repository: HubbleRepository,
+    private val repository: FakeHubbleRepository,
+    private val repliesRepository: RepliesRepository,
     private val videoCacheManager: VideoCacheManager,
     private val connectivityObserver: ConnectivityObserver,
 ) : ViewModel() {
     val dataSourceFactory = videoCacheManager.getDataSourceFactory()
+
+    val selectedTab: StateFlow<RepliesFilterTab> = repliesRepository.selectedTab
+
     val isConnected = connectivityObserver
         .isConnected
         .stateIn(
@@ -48,7 +56,21 @@ class ReplyLogViewModel @Inject constructor(
     private val _isLoadingMessageList = MutableStateFlow(true)
     val isLoadingMessageList: StateFlow<Boolean> = _isLoadingMessageList.asStateFlow()
 
-    private val _currentUserId = MutableStateFlow<String?>("f0c7cfbc-604b-437e-bcce-2f6e17e063b7")
+    private val _currentUserId = MutableStateFlow<String?>("user_me")//("f0c7cfbc-604b-437e-bcce-2f6e17e063b7")
+
+    val messagesState: StateFlow<RepliesScreenMessagesState> =
+        repliesRepository.repliesMessagesState
+            .onStart { _isLoadingMessageList.value = true }
+            .onEach { _isLoadingMessageList.value = false }
+            .catch {
+                _isLoadingMessageList.value = true
+                emit(RepliesScreenMessagesState())
+            }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            RepliesScreenMessagesState()
+        )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val messageList = _currentUserId
@@ -102,4 +124,12 @@ class ReplyLogViewModel @Inject constructor(
             }
         }
     }
+
+    fun setSelectedTab(tab: RepliesFilterTab) {
+        repliesRepository.setSelectedTab(tab)
+    }
+}
+
+enum class RepliesFilterTab {
+    FOR_ME, MY_POSTS, OTHER_POSTS
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
+import com.orb.hubble.repository.FakePostRepository
 import com.orb.hubble.repository.HubbleRepository
 import com.orb.hubble.repository.PostRepository
 import com.orb.hubble.utils.ConnectivityObserver
@@ -32,7 +33,7 @@ class ViewingPostViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val videoCacheManager: VideoCacheManager,
     private val savedStateHandle: SavedStateHandle
-): ViewModel() {
+) : ViewModel() {
     val dataSourceFactory = videoCacheManager.getDataSourceFactory()
 
     val isConnected = connectivityObserver
@@ -45,6 +46,8 @@ class ViewingPostViewModel @Inject constructor(
 
     private val pageId: String? = savedStateHandle["pageId"]
     private val singlePostId: String? = savedStateHandle["postId"]
+
+    private val postIsFrom: PostIsFrom? = savedStateHandle["isFrom"]
 
     private var _statuses = MutableStateFlow<List<Status>>(emptyList())
     val statuses = _statuses.asStateFlow()
@@ -70,32 +73,51 @@ class ViewingPostViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoadingPosts.value = true
 
-            when {
-                singlePostId == null -> {
-                    viewModelScope.launch {
+            if (postIsFrom != null) {
+                when (postIsFrom) {
+                    PostIsFrom.HOME_SCREEN -> {
                         postRepository.homeScreenStatuses.collect { statuses ->
                             _statuses.value = statuses
+                            _isLoadingPosts.value = false
                         }
                     }
-                    _isLoadingPosts.value = false
-                }
 
-                else -> {
-                    repository.getPost(singlePostId).collect { postList ->
-                        if (postList.isNotEmpty()) {
-                            val post = postList.first()
-
-                            _statuses.value = listOf(
-                                Status(
-                                    pageId = post.pageId,
-                                    ownerId = post.page.ownerId,
-                                    username = post.page.name,
-                                    posts = listOf(post),
-                                    profilePic = ""
-                                )
-                            )
+                    PostIsFrom.MY_POSTS -> {
+                        postRepository.myPosts.collect { status ->
+                            if (status != null) {
+                                _statuses.value = listOf(status)
+                            }
+                            _isLoadingPosts.value = false
                         }
-                        _isLoadingPosts.value = false
+                    }
+
+                    PostIsFrom.EXPLORE -> {
+
+                    }
+
+                    PostIsFrom.SINGLE_POST -> {
+                        if (!singlePostId.isNullOrEmpty()) {
+                            repository.getPost(singlePostId).collect { postList ->
+                                if (postList.isNotEmpty()) {
+                                    val post = postList.first()
+
+                                    _statuses.value = listOf(
+                                        Status(
+                                            pageId = post.pageId,
+                                            ownerId = post.page.ownerId,
+                                            username = post.page.name,
+                                            posts = listOf(post),
+                                            profilePic = ""
+                                        )
+                                    )
+                                }
+                                _isLoadingPosts.value = false
+                            }
+                        }
+                    }
+
+                    PostIsFrom.NOWHERE -> {
+
                     }
                 }
             }
@@ -149,4 +171,8 @@ class ViewingPostViewModel @Inject constructor(
             Log.d("isConnected", "isConnected is ${isConnected.value} instead of false")
         }
     }
+}
+
+enum class PostIsFrom {
+    HOME_SCREEN, MY_POSTS, EXPLORE, SINGLE_POST, NOWHERE
 }
