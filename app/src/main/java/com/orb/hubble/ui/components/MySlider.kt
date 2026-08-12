@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.MutatorMutex
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.DragScope
 import androidx.compose.foundation.gestures.DraggableState
@@ -15,8 +16,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -42,10 +46,12 @@ import androidx.compose.material3.SliderState
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -74,6 +80,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
@@ -85,6 +92,7 @@ import androidx.compose.ui.util.unpackFloat2
 import com.orb.hubble.ui.theme.Black4
 import com.orb.hubble.ui.theme.Grey1
 import com.orb.hubble.ui.theme.Grey2
+import com.orb.hubble.ui.theme.White1
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -499,6 +507,41 @@ class MySliderState(
     }
 }
 
+@Composable
+fun MyThumb(
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    thumbSize: DpSize = DpSize(4.0.dp, 44.0.dp),
+) {
+    val interactions = remember { mutableStateListOf<Interaction>() }
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> interactions.add(interaction)
+                is PressInteraction.Release -> interactions.remove(interaction.press)
+                is PressInteraction.Cancel -> interactions.remove(interaction.press)
+                is DragInteraction.Start -> interactions.add(interaction)
+                is DragInteraction.Stop -> interactions.remove(interaction.start)
+                is DragInteraction.Cancel -> interactions.remove(interaction.start)
+            }
+        }
+    }
+
+    val size =
+        if (interactions.isNotEmpty()) {
+            thumbSize.copy(width = thumbSize.width / 2)
+        } else {
+            thumbSize
+        }
+    Spacer(
+        modifier
+            .size(size)
+            .hoverable(interactionSource = interactionSource)
+            .background(White1, /* ShapeKeyTokens.CornerFull */)
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyRangeSlider(
@@ -531,23 +574,25 @@ fun MyRangeSlider(
         endInteractionSource = endInteractionSource,
         centerInteractionSource = centerInteractionSource,
         startThumb = {
-            SliderDefaults.Thumb(
+            MyThumb(
                 interactionSource = startInteractionSource,
-                colors = colors,
                 enabled = enabled,
             )
         },
         endThumb = {
-            SliderDefaults.Thumb(
+            MyThumb(
                 interactionSource = endInteractionSource,
-                colors = colors,
                 enabled = enabled,
             )
+//            SliderDefaults.Thumb(
+//                interactionSource = endInteractionSource,
+//                colors = colors,
+//                enabled = enabled,
+//            )
         },
         centerThumb = {
-            SliderDefaults.Thumb(
-                interactionSource = endInteractionSource,
-                colors = colors,
+            MyThumb(
+                interactionSource = centerInteractionSource,
                 enabled = enabled,
             )
         },
@@ -577,23 +622,20 @@ fun RangeSlider1(
     endInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     centerInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     startThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
+        MyThumb(
             interactionSource = startInteractionSource,
-            colors = colors,
             enabled = enabled,
         )
     },
     endThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
+        MyThumb(
             interactionSource = endInteractionSource,
-            colors = colors,
             enabled = enabled,
         )
     },
     centerThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
-            interactionSource = endInteractionSource,
-            colors = colors,
+        MyThumb(
+            interactionSource = centerInteractionSource,
             enabled = enabled,
         )
     },
@@ -650,23 +692,20 @@ fun RangeSlider2(
     endInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     centerInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     startThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
+        MyThumb(
             interactionSource = startInteractionSource,
-            colors = colors,
             enabled = enabled,
         )
     },
     endThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
+        MyThumb(
             interactionSource = endInteractionSource,
-            colors = colors,
             enabled = enabled,
         )
     },
     centerThumb: @Composable (MyRangeSliderState) -> Unit = {
-        SliderDefaults.Thumb(
-            interactionSource = endInteractionSource,
-            colors = colors,
+        MyThumb(
+            interactionSource = centerInteractionSource,
             enabled = enabled,
         )
     },

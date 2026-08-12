@@ -20,6 +20,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -50,7 +52,7 @@ internal fun MyRangeSliderTrack(
     drawTick: DrawScope.(Offset, Color) -> Unit = { offset, color ->
         drawStopIndicator(offset = offset, color = color, size = TickSize)
     },
-    thumbTrackGapSize: Dp = 6.0.dp,
+    thumbTrackGapSize: Dp = 0.0.dp,//formerly 6.0.dp
     trackInsideCornerSize: Dp = 2.dp,
 ) {
     TrackImpl(
@@ -222,9 +224,19 @@ private fun DrawScope.drawTrack(
             orientation,
             trackOffset,
             trackSize,
+            inactiveTrackColor.copy(alpha = 0.1f),
+            0f,
+            0f,//formerly endCornerRadius
+            shouldFill = true
+        )
+        drawTrackPath(
+            orientation,
+            trackOffset,
+            trackSize,
             inactiveTrackColor,
-            startCornerRadius,
-            endCornerRadius,
+            0f,
+            0f,//formerly endCornerRadius
+            shouldFill = false
         )
         val stopIndicatorOffset =
             if (isVertical) {
@@ -234,7 +246,7 @@ private fun DrawScope.drawTrack(
             } else {
                 Offset(start + cornerSize, center.y)
             }
-        drawStopIndicator?.invoke(this, stopIndicatorOffset)
+        //drawStopIndicator?.invoke(this, stopIndicatorOffset)
     }
     // inactive track
     var inactiveTrackThreshold = sliderEnd - endGap
@@ -273,9 +285,19 @@ private fun DrawScope.drawTrack(
             orientation,
             trackOffset,
             size,
+            inactiveTrackColor.copy(alpha = 0.1f),
+            0f, //formerly startCornerRadius
+            0f,
+            shouldFill = true
+        )
+        drawTrackPath(
+            orientation,
+            trackOffset,
+            size,
             inactiveTrackColor,
-            startCornerRadius,
-            endCornerRadius,
+            0f, //formerly startCornerRadius
+            0f,
+            shouldFill = false
         )
         val stopIndicatorOffset =
             if (isVertical) {
@@ -285,7 +307,7 @@ private fun DrawScope.drawTrack(
             } else {
                 Offset(end - cornerSize, center.y)
             }
-        drawStopIndicator?.invoke(this, stopIndicatorOffset)
+        //drawStopIndicator?.invoke(this, stopIndicatorOffset)
     }
     // active track
     val activeTrackStart =
@@ -303,9 +325,9 @@ private fun DrawScope.drawTrack(
             sliderValueEnd - endGap
         }
     val startCornerRadius =
-        if (isRtlHorizontal || isCentered || isRangeSlider) insideCornerSize else cornerSize
+        if (isRtlHorizontal || isCentered || isRangeSlider) cornerSize /* insideCornerSize */ else cornerSize
     val endCornerRadius =
-        if (isRtlHorizontal && !isCentered && !isRangeSlider) cornerSize else insideCornerSize
+        if (isRtlHorizontal && !isCentered && !isRangeSlider) cornerSize else cornerSize /* insideCornerSize */
     val activeTrackWidth =
         if (isRtlHorizontal && !isCentered && !isRangeSlider) activeTrackEnd
         else activeTrackEnd - activeTrackStart
@@ -335,8 +357,8 @@ private fun DrawScope.drawTrack(
             trackOffset,
             size,
             activeTrackColor,
-            startCornerRadius,
-            endCornerRadius,
+            0f,
+            0f,
         )
     }
 
@@ -387,6 +409,7 @@ private fun DrawScope.drawTrackPath(
     color: Color,
     startCornerRadius: Float,
     endCornerRadius: Float,
+    shouldFill: Boolean = false
 ) {
     val startCorner = CornerRadius(startCornerRadius, startCornerRadius)
     val endCorner = CornerRadius(endCornerRadius, endCornerRadius)
@@ -401,7 +424,7 @@ private fun DrawScope.drawTrackPath(
             )
         } else {
             RoundRect(
-                rect = Rect(offset, size = Size(size.width, size.height)),
+                rect = Rect(offset, size = Size(size.width, 100f)),
                 topLeft = startCorner,
                 topRight = endCorner,
                 bottomRight = endCorner,
@@ -409,7 +432,7 @@ private fun DrawScope.drawTrackPath(
             )
         }
     trackPath.addRoundRect(track)
-    drawPath(trackPath, color)
+    drawPath(trackPath, color, style = if (shouldFill) Fill else Stroke(width = 6f))
     trackPath.rewind()
 }
 
