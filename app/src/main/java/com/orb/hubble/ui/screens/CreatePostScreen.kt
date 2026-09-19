@@ -205,13 +205,13 @@ fun CreatePostScreen(
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 50.dp)
+                .padding(top = 50.dp)//60.dp
         ) {
             if (isVideo) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(60.dp),
+                        .height(50.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -251,7 +251,7 @@ fun CreatePostScreen(
                             sliderPosition = it
                         },
                         value = startTime..endTime,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier,//.fillMaxSize(),
                         onValueChange = { range ->
                             val newStart = range.start.coerceIn(0f, maxVideoDurationSec)
                             val newEnd = range.endInclusive.coerceIn(0f, maxVideoDurationSec)

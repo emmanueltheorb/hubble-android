@@ -512,7 +512,7 @@ fun MyThumb(
     interactionSource: MutableInteractionSource,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    thumbSize: DpSize = DpSize(4.0.dp, 44.0.dp),
+    thumbSize: DpSize = DpSize(2.0.dp, 10.0.dp),
 ) {
     val interactions = remember { mutableStateListOf<Interaction>() }
     LaunchedEffect(interactionSource) {
@@ -534,6 +534,41 @@ fun MyThumb(
         } else {
             thumbSize
         }
+    Spacer(
+        modifier
+            .size(size)
+            .hoverable(interactionSource = interactionSource)
+            .background(White1, /* ShapeKeyTokens.CornerFull */)
+    )
+}
+
+@Composable
+fun MyCenterThumb(
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    thumbSize: DpSize = DpSize(2.0.dp, 40.0.dp),
+) {
+    val interactions = remember { mutableStateListOf<Interaction>() }
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> interactions.add(interaction)
+                is PressInteraction.Release -> interactions.remove(interaction.press)
+                is PressInteraction.Cancel -> interactions.remove(interaction.press)
+                is DragInteraction.Start -> interactions.add(interaction)
+                is DragInteraction.Stop -> interactions.remove(interaction.start)
+                is DragInteraction.Cancel -> interactions.remove(interaction.start)
+            }
+        }
+    }
+
+    val size = thumbSize
+//        if (interactions.isNotEmpty()) {
+//            thumbSize.copy(width = thumbSize.width / 2)
+//        } else {
+//            thumbSize
+//        }
     Spacer(
         modifier
             .size(size)
@@ -591,7 +626,7 @@ fun MyRangeSlider(
 //            )
         },
         centerThumb = {
-            MyThumb(
+            MyCenterThumb(
                 interactionSource = centerInteractionSource,
                 enabled = enabled,
             )
@@ -634,7 +669,7 @@ fun RangeSlider1(
         )
     },
     centerThumb: @Composable (MyRangeSliderState) -> Unit = {
-        MyThumb(
+        MyCenterThumb(
             interactionSource = centerInteractionSource,
             enabled = enabled,
         )
@@ -704,7 +739,7 @@ fun RangeSlider2(
         )
     },
     centerThumb: @Composable (MyRangeSliderState) -> Unit = {
-        MyThumb(
+        MyCenterThumb(
             interactionSource = centerInteractionSource,
             enabled = enabled,
         )
@@ -1074,23 +1109,32 @@ private fun MyRangeSliderImpl(
         modifier =
             modifier
                 .minimumInteractiveComponentSize()
-                .requiredSizeIn(minWidth = 4.0.dp, minHeight = 44.0.dp)
+                //.requiredSizeIn(minWidth = 4.0.dp, minHeight = 50.0.dp)
                 .then(pressDrag),
     ) { measurables, constraints ->
         val startThumbPlaceable =
             measurables
                 .fastFirst { it.layoutId == "startThumb" }
-                .measure(constraints)
+                .measure(
+                    constraints
+                        .copy(minWidth = 0, minHeight = 0)
+                )
 
         val endThumbPlaceable =
             measurables
                 .fastFirst { it.layoutId == "endThumb" }
-                .measure(constraints)
+                .measure(
+                    constraints
+                        .copy(minWidth = 0, minHeight = 0)
+                )
 
         val centerThumbPlaceable =
             measurables
                 .fastFirst { it.layoutId == "centerThumb" }
-                .measure(constraints)
+                .measure(
+                    constraints
+                        .copy(minWidth = 0, minHeight = 0)
+                )
 
         val trackPlaceable =
             measurables
@@ -1143,7 +1187,7 @@ private fun MyRangeSliderImpl(
             } else {
                 (trackPlaceable.width * endValueAsFraction + endCorrection).roundToInt()
             }
-        val trackOffsetY = (sliderHeight - trackPlaceable.height) / 2
+        val trackOffsetY = 0 //(sliderHeight - trackPlaceable.height) / 2
         val startThumbOffsetY = (sliderHeight - startThumbPlaceable.height) / 2
         val endThumbOffsetY = (sliderHeight - endThumbPlaceable.height) / 2
 

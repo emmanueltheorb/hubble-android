@@ -18,11 +18,14 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -86,17 +89,20 @@ private fun TrackImpl(
     val inactiveTickColor = tickColor(enabled, active = false)
     val activeTickColor = tickColor(enabled, active = true)
     Canvas(
-        modifier.fillMaxWidth().height(16.0.dp).layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            val trackCornerSize = placeable.height / 2
-            layout(
-                width = placeable.width,
-                height = placeable.height,
-                alignmentLines = mapOf(CornerSizeAlignmentLine to trackCornerSize),
-            ) {
-                placeable.place(0, 0)
+        modifier
+            .fillMaxWidth()
+            .height(40.0.dp)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val trackCornerSize = placeable.height / 2
+                layout(
+                    width = placeable.width,
+                    height = placeable.height,
+                    alignmentLines = mapOf(CornerSizeAlignmentLine to trackCornerSize),
+                ) {
+                    placeable.place(0, 0)
+                }
             }
-        }
     ) {
         val cornerSize: Float =
             if (trackCornerSize == Dp.Unspecified) {
@@ -224,10 +230,11 @@ private fun DrawScope.drawTrack(
             orientation,
             trackOffset,
             trackSize,
-            inactiveTrackColor.copy(alpha = 0.1f),
+            inactiveTrackColor.copy(alpha = 0.3f),
             0f,
             0f,//formerly endCornerRadius
-            shouldFill = true
+            shouldFill = true,
+            trackPosition = TrackPosition.START
         )
         drawTrackPath(
             orientation,
@@ -236,7 +243,8 @@ private fun DrawScope.drawTrack(
             inactiveTrackColor,
             0f,
             0f,//formerly endCornerRadius
-            shouldFill = false
+            shouldFill = false,
+            trackPosition = TrackPosition.START
         )
         val stopIndicatorOffset =
             if (isVertical) {
@@ -285,10 +293,11 @@ private fun DrawScope.drawTrack(
             orientation,
             trackOffset,
             size,
-            inactiveTrackColor.copy(alpha = 0.1f),
+            inactiveTrackColor.copy(alpha = 0.3f),
             0f, //formerly startCornerRadius
             0f,
-            shouldFill = true
+            shouldFill = true,
+            trackPosition = TrackPosition.END
         )
         drawTrackPath(
             orientation,
@@ -297,7 +306,8 @@ private fun DrawScope.drawTrack(
             inactiveTrackColor,
             0f, //formerly startCornerRadius
             0f,
-            shouldFill = false
+            shouldFill = false,
+            trackPosition = TrackPosition.END
         )
         val stopIndicatorOffset =
             if (isVertical) {
@@ -359,6 +369,7 @@ private fun DrawScope.drawTrack(
             activeTrackColor,
             0f,
             0f,
+            trackPosition = TrackPosition.CENTER
         )
     }
 
@@ -409,7 +420,8 @@ private fun DrawScope.drawTrackPath(
     color: Color,
     startCornerRadius: Float,
     endCornerRadius: Float,
-    shouldFill: Boolean = false
+    shouldFill: Boolean = false,
+    trackPosition: TrackPosition
 ) {
     val startCorner = CornerRadius(startCornerRadius, startCornerRadius)
     val endCorner = CornerRadius(endCornerRadius, endCornerRadius)
@@ -431,7 +443,203 @@ private fun DrawScope.drawTrackPath(
                 bottomLeft = startCorner,
             )
         }
-    trackPath.addRoundRect(track)
+    //trackPath.addRoundRect(track)
+    val radiusPx: Float = 20f
+
+    trackPath.apply {
+        val height = size.height
+        val radius = radiusPx //height / 2f
+
+        val startX = offset.x
+        val endX = offset.x + size.width
+        val topY = offset.y
+        val bottomY = offset.y + height
+        val boxBottom = offset.y + (radius * 2)
+        val boxTop = bottomY - (radius * 2)
+
+        when (trackPosition) {
+            TrackPosition.START -> {
+                moveTo(startX + radius, topY)
+                lineTo(endX + radius, topY)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX,
+                        right = endX + (radius * 2),
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 270f,
+                    sweepAngleDegrees = -90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(endX, boxTop)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX,
+                        right = endX + (radius * 2),
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 180f,
+                    sweepAngleDegrees = -90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX + radius, bottomY)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX,
+                        right = startX + (radius * 2),
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 90f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX, boxBottom)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX,
+                        right = startX + (radius * 2),
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 180f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                close()
+            }
+            TrackPosition.CENTER -> {
+                moveTo(startX + radius, topY)
+                lineTo(endX - radius, topY)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX - (radius * 2),
+                        right = endX,
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 270f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(endX, boxTop)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX - (radius * 2),
+                        right = endX,
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 0f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX + radius, bottomY)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX,
+                        right = startX + (radius * 2),
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 90f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX, boxBottom)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX,
+                        right = startX + (radius * 2),
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 180f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                close()
+            }
+            TrackPosition.END -> {
+                moveTo(startX, topY)
+                lineTo(endX - radius, topY)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX - (radius * 2),
+                        right = endX,
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 270f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(endX, boxTop)
+
+                arcTo(
+                    rect = Rect(
+                        left = endX - (radius * 2),
+                        right = endX,
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 0f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX, bottomY)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX - (radius * 2),
+                        right = startX,
+                        top = boxTop,
+                        bottom = bottomY
+                    ),
+                    startAngleDegrees = 90f,
+                    sweepAngleDegrees = -90f,
+                    forceMoveTo = false
+                )
+
+                lineTo(startX, boxBottom)
+
+                arcTo(
+                    rect = Rect(
+                        left = startX - (radius * 2),
+                        right = startX,
+                        top = topY,
+                        bottom = boxBottom
+                    ),
+                    startAngleDegrees = 0f,
+                    sweepAngleDegrees = -90f,
+                    forceMoveTo = false
+                )
+
+                close()
+            }
+        }
+    }
     drawPath(trackPath, color, style = if (shouldFill) Fill else Stroke(width = 6f))
     trackPath.rewind()
 }
@@ -462,7 +670,7 @@ internal fun thumbColor(enabled: Boolean): Color =
 @Stable
 internal fun trackColor(enabled: Boolean, active: Boolean): Color =
     if (enabled) {
-        if (active) White1 else Color.Green
+        if (active) White1 else Color.DarkGray
     } else {
         if (active) Grey2 else Purple40
     }
@@ -474,3 +682,71 @@ internal fun tickColor(enabled: Boolean, active: Boolean): Color =
     } else {
         if (active) Grey2 else Purple40
     }
+
+class ConcaveTopLeftShape(private val radiusPx: Float) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val path = Path().apply {
+            // Start at the end of the top-left curve on the top edge
+            moveTo(radiusPx, 0f)
+
+            // Draw top edge to top-right
+            lineTo(size.width, 0f)
+            // Draw right edge to bottom-right
+            lineTo(size.width, size.height)
+            // Draw bottom edge to bottom-left
+            lineTo(0f, size.height)
+            //Draw left edge up to where the concave curve begins
+            lineTo(0f, radiusPx)
+
+            // Inverted/Concave corner bending into itself:
+            // This sweeps an arc from (0, radiusPx) to (radiusPx, 0)
+            // using a bounding box centered on (0, 0)
+            arcTo(
+                rect = Rect(
+                    left = -radiusPx,
+                    top = -radiusPx,
+                    right = radiusPx,
+                    bottom = radiusPx
+                ),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = -90f, // Negative sweep bends it inward
+                forceMoveTo = false
+            )
+            close()
+        }
+
+        val path2 = Path().apply {
+            lineTo(size.width, 0f)
+
+            arcTo(
+                rect = Rect(
+                    left = size.height,
+                    right = -(size.height),
+                    top = size.height,
+                    bottom = size.height
+                ),
+                startAngleDegrees = 270f,
+                sweepAngleDegrees = -180f,
+                forceMoveTo = false
+            )
+
+            lineTo(0f, size.height)
+            lineTo(0f, 0f)
+        }
+
+        return Outline.Generic(path)
+    }
+
+}
+
+private fun Path.addCustomShape(radiusPx: Float) {
+
+}
+
+enum class TrackPosition {
+    START, CENTER, END
+}
